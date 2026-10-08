@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Salle des profs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } };
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; overflow: hidden; }
+        .card-stack { perspective: 1000px; }
+        .swipe-card {
+            position: absolute; inset: 0;
+            will-change: transform; touch-action: none; user-select: none;
+            transform-origin: 50% 100%;
+            box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.45);
+        }
+        .swipe-card.animating { transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15), opacity 0.3s ease; }
+        .stamp {
+            border: 4px solid; border-radius: 10px; padding: 4px 14px;
+            font-weight: 800; font-size: 1.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+            opacity: 0; pointer-events: none; transition: opacity 0.1s ease;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes pop { 0% { transform: scale(.7); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
+        .pop { animation: pop .35s cubic-bezier(0.175, 0.885, 0.32, 1.3) both; }
+    </style>
+</head>
+<body class="bg-slate-950 text-white h-[100dvh] w-screen flex flex-col items-center justify-between overflow-hidden">
+
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div class="absolute -top-24 -left-24 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl"></div>
+        <div class="absolute top-1/2 -right-24 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl"></div>
+    </div>
+
+    <!-- En-tête -->
+    <header class="w-full max-w-md px-4 pt-4 pb-2 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-tr from-emerald-500 to-sky-500 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <i class="fa-solid fa-chalkboard-user text-white text-lg"></i>
+            </div>
+            <div class="min-w-0">
+                <h1 id="Greeting" class="font-extrabold text-lg tracking-tight truncate">Salle des profs</h1>
+                <p id="DeckCounter" class="text-[11px] text-slate-400 font-medium">Chargement…</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <button id="AddResourceBtn" title="Partager une ressource" class="w-10 h-10 rounded-full bg-slate-900/90 border border-slate-800 hover:border-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition active:scale-95">
+                <i class="fa-solid fa-plus text-sm"></i>
+            </button>
+            <button id="ProfileBtn" title="Mon profil" class="w-10 h-10 rounded-full bg-slate-900/90 border border-slate-800 hover:border-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition active:scale-95">
+                <i class="fa-solid fa-user text-sm"></i>
+            </button>
+            <button id="ToggleGalleryBtn" title="Mon réseau" class="px-3.5 h-10 rounded-full bg-slate-900/90 border border-slate-800 hover:border-slate-700 flex items-center gap-2 text-slate-200 hover:text-white transition active:scale-95">
+                <i class="fa-solid fa-user-group text-emerald-400 text-sm"></i>
+                <span id="NetworkCountBadge" class="text-xs font-bold">0</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Filtres -->
+    <div id="Filters" class="w-full max-w-md px-4 py-1.5 flex items-center gap-2 overflow-x-auto no-scrollbar z-20 shrink-0"></div>
+
+    <main class="relative w-full max-w-md flex-1 px-4 py-2 flex flex-col items-center justify-center z-10 min-h-0">
+        <div id="CardStack" class="card-stack relative w-full h-full max-h-[560px] rounded-3xl"></div>
+
+        <div id="EmptyState" class="hidden absolute inset-4 rounded-3xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-md flex-col items-center justify-center p-8 text-center z-10">
+            <div class="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
+                <i class="fa-solid fa-mug-hot text-3xl text-emerald-400"></i>
+            </div>
+            <h2 class="text-xl font-bold mb-2">Tu as fait le tour!</h2>
+            <p class="text-sm text-slate-400 mb-6 max-w-xs">Tu as vu tous les profils et ressources de cette catégorie. Va voir ton réseau ou recommence.</p>
+            <div class="flex flex-wrap gap-3 justify-center">
+                <button id="ResetDeckBtn" class="px-5 py-2.5 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 font-semibold text-sm active:scale-95 transition flex items-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> Recommencer
+                </button>
+                <button id="EmptyViewNetworkBtn" class="px-5 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm active:scale-95 transition flex items-center gap-2">
+                    <i class="fa-solid fa-user-group text-emerald-400"></i> Mon réseau
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Boutons d'action -->
+    <footer class="w-full max-w-md px-6 pt-2 pb-6 flex items-center justify-center gap-5 z-20 shrink-0">
+        <button id="UndoBtn" disabled title="Annuler (Retour arrière)" class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 text-amber-400 flex items-center justify-center shadow-lg hover:bg-slate-800 disabled:opacity-35 disabled:pointer-events-none active:scale-90 transition">
+            <i class="fa-solid fa-rotate-left text-lg"></i>
+        </button>
+        <button id="NopeBtn" title="Passer (←)" class="w-16 h-16 rounded-full bg-slate-900 border-2 border-slate-600 hover:border-slate-400 text-slate-300 flex items-center justify-center shadow-xl hover:bg-slate-700 active:scale-90 transition">
+            <i class="fa-solid fa-xmark text-3xl"></i>
+        </button>
+        <button id="SuperBtn" title="Demander du mentorat / Essentiel (↑)" class="w-12 h-12 rounded-full bg-slate-900 border border-sky-500/40 hover:border-sky-400 text-sky-400 flex items-center justify-center shadow-lg hover:bg-sky-500 hover:text-white active:scale-90 transition">
+            <i class="fa-solid fa-star text-lg"></i>
+        </button>
+        <button id="LikeBtn" title="Connecter / Sauvegarder (→)" class="w-16 h-16 rounded-full bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-400 text-emerald-400 flex items-center justify-center shadow-xl hover:bg-emerald-500 hover:text-white active:scale-90 transition">
+            <i class="fa-solid fa-handshake text-2xl"></i>
+        </button>
+    </footer>
+
+    <!-- Mon réseau -->
+    <div id="GalleryModal" class="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-40 hidden flex-col items-center">
+        <div class="w-full max-w-md flex flex-col h-full">
+            <div class="px-5 py-4 border-b border-slate-800/80 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-user-group text-emerald-400 text-lg"></i>
+                    <h2 class="font-bold text-lg">Mon réseau</h2>
+                </div>
+                <button data-close="GalleryModal" class="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="GalleryTabs" class="px-5 pt-3 flex gap-2"></div>
+            <div id="GalleryList" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+        </div>
+    </div>
+
+    <!-- C'est un match -->
+    <div id="MatchModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div id="MatchContent" class="pop w-full max-w-sm rounded-3xl bg-slate-900 border border-emerald-500/30 p-6 text-center shadow-2xl"></div>
+    </div>
+
+    <!-- Mon profil -->
+    <div id="ProfileModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="font-bold text-lg">Bienvenue dans l'équipe! 👋</h3>
+                <button data-close="ProfileModal" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">Dis-nous qui tu es : on mettra en premier les collègues de ta matière et de ton niveau.</p>
+            <form id="ProfileForm" class="space-y-3">
+                <div>
+                    <label for="ProfileName" class="block text-xs font-semibold text-slate-400 mb-1">Prénom</label>
+                    <input id="ProfileName" required placeholder="Alex" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="ProfileGroup" class="block text-xs font-semibold text-slate-400 mb-1">Matière</label>
+                        <select id="ProfileGroup" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm focus:outline-none focus:border-emerald-500"></select>
+                    </div>
+                    <div>
+                        <label for="ProfileLevel" class="block text-xs font-semibold text-slate-400 mb-1">Niveau</label>
+                        <select id="ProfileLevel" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm focus:outline-none focus:border-emerald-500">
+                            <option>1er cycle</option>
+                            <option>2e cycle</option>
+                            <option>Adaptation scolaire</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 font-bold text-sm hover:opacity-95 transition">
+                    C'est parti
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Partager une ressource -->
+    <div id="AddResourceModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-lg">Partager une ressource</h3>
+                <button data-close="AddResourceModal" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="AddResourceForm" class="space-y-3">
+                <div>
+                    <label for="ResTitle" class="block text-xs font-semibold text-slate-400 mb-1">Titre</label>
+                    <input id="ResTitle" required placeholder="Ma grille de correction" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="ResType" class="block text-xs font-semibold text-slate-400 mb-1">Type</label>
+                        <select id="ResType" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm focus:outline-none focus:border-emerald-500"></select>
+                    </div>
+                    <div>
+                        <label for="ResGroup" class="block text-xs font-semibold text-slate-400 mb-1">Matière</label>
+                        <select id="ResGroup" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm focus:outline-none focus:border-emerald-500"></select>
+                    </div>
+                </div>
+                <div>
+                    <label for="ResLink" class="block text-xs font-semibold text-slate-400 mb-1">Lien (optionnel)</label>
+                    <input id="ResLink" type="url" placeholder="https://…" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label for="ResDesc" class="block text-xs font-semibold text-slate-400 mb-1">Pourquoi c'est utile</label>
+                    <textarea id="ResDesc" rows="2" placeholder="M'a sauvé la vie en septembre…" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500"></textarea>
+                </div>
+                <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 font-bold text-sm hover:opacity-95 transition">
+                    Ajouter au paquet
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="ToastBanner" class="fixed bottom-28 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-slate-900/95 border border-slate-700 text-xs font-semibold shadow-xl pointer-events-none opacity-0 transition-opacity duration-200 z-[60]"></div>
+
+    <script>
+        // ---------- Données de démonstration (à remplacer par Firebase) ----------
+        const GROUPS = {
+            francais: { label: 'Français & langues', emoji: '📝' },
+            sciences: { label: 'Maths & sciences', emoji: '🧮' },
+            univers: { label: 'Univers social', emoji: '🌍' },
+            arts: { label: 'Arts & éduc. physique', emoji: '🎨' },
+            soutien: { label: 'Soutien & direction', emoji: '🤝' },
+        };
+        const RESOURCE_TYPES = {
+            guide: { label: 'Guide', icon: 'fa-book-open' },
+            planif: { label: 'Planification', icon: 'fa-calendar-days' },
+            outil: { label: 'Outil', icon: 'fa-screwdriver-wrench' },
+            gabarit: { label: 'Gabarit', icon: 'fa-file-lines' },
+            lieu: { label: "Lieu à l'école", icon: 'fa-map-location-dot' },
+        };
+        const GRADIENTS = ['from-emerald-500 to-teal-700', 'from-sky-500 to-indigo-700', 'from-amber-500 to-rose-600',
+            'from-fuchsia-500 to-purple-700', 'from-lime-500 to-emerald-700', 'from-rose-500 to-orange-600', 'from-cyan-500 to-blue-700'];
+
+        const TEACHERS = [
+            { id: 't1', name: 'Marie Tremblay', role: 'Enseignante de français', group: 'francais', level: '1er cycle', years: 14, room: 'Local 214',
+              mentor: true, open: true, availability: 'Dîner mardi et jeudi', email: 'marie.tremblay@ecole.exemple',
+              tags: ['Lecture', 'Gestion de classe', 'Club de lecture'],
+              helpWith: 'Planifier ta première étape et corriger sans y passer tes soirées.',
+              bio: "Ma porte est toujours ouverte. Je me souviens très bien de ma première année!" },
+            { id: 't2', name: 'Karim Benali', role: 'Enseignant de mathématiques', group: 'sciences', level: '2e cycle', years: 9, room: 'Local 308',
+              mentor: true, open: true, availability: 'Avant 8 h, tous les jours', email: 'karim.benali@ecole.exemple',
+              tags: ['Mathématiques', 'Robotique', 'Évaluation'],
+              helpWith: 'Les situations-problèmes, les grilles d\'évaluation et le TNI.',
+              bio: 'Responsable du club de robotique. Je partage tout mon matériel sans problème.' },
+            { id: 't3', name: 'Sophie Lavoie', role: 'Orthopédagogue', group: 'soutien', level: 'Adaptation scolaire', years: 11, room: 'Local 112',
+              mentor: false, open: true, availability: 'Mercredi après-midi', email: 'sophie.lavoie@ecole.exemple',
+              tags: ['Plans d\'intervention', 'Différenciation', 'TDAH'],
+              helpWith: 'Adapter tes évaluations et comprendre les plans d\'intervention.',
+              bio: 'Viens me voir dès que tu as un doute sur un élève. Plus tôt, c\'est mieux!' },
+            { id: 't4', name: 'Julien Côté', role: 'Enseignant d\'éducation physique', group: 'arts', level: '1er cycle', years: 4, room: 'Gymnase B',
+              mentor: false, open: true, availability: 'Pause de 10 h', email: 'julien.cote@ecole.exemple',
+              tags: ['Sports parascolaires', 'Plein air', 'Engagement'],
+              helpWith: 'Organiser une sortie et monter un projet parascolaire.',
+              bio: 'Moi aussi j\'étais nouveau il n\'y a pas si longtemps. On organise un 5 à 7 de profs chaque mois!' },
+            { id: 't5', name: 'Amélie Gagnon', role: 'Enseignante d\'histoire', group: 'univers', level: '2e cycle', years: 18, room: 'Local 221',
+              mentor: true, open: false, availability: 'Vendredi midi', email: 'amelie.gagnon@ecole.exemple',
+              tags: ['Histoire', 'Pédagogie par projets', 'Sorties éducatives'],
+              helpWith: 'Les projets interdisciplinaires et les sorties éducatives.',
+              bio: '18 ans ici. Je connais tous les secrets du bâtiment (et où trouver le meilleur café).' },
+            { id: 't6', name: 'Nadia Pierre', role: 'Enseignante d\'anglais', group: 'francais', level: '2e cycle', years: 6, room: 'Local 210',
+              mentor: false, open: true, availability: 'Dîner lundi', email: 'nadia.pierre@ecole.exemple',
+              tags: ['Anglais', 'Jeux en classe', 'Numérique'],
+              helpWith: 'Les outils numériques et rendre ta classe plus active.',
+              bio: 'Fan des jeux pédagogiques et de Kahoot. Je teste tout avant tout le monde.' },
+            { id: 't7', name: 'François Bouchard', role: 'Conseiller pédagogique', group: 'soutien', level: 'Tous les niveaux', years: 22, room: 'Bureau 102',
+              mentor: true, open: true, availability: 'Sur rendez-vous', email: 'francois.bouchard@ecole.exemple',
+              tags: ['Insertion professionnelle', 'Programme', 'Formation'],
+              helpWith: 'Le programme d\'insertion des nouveaux profs et tes questions sur le programme.',
+              bio: 'J\'accompagne les nouveaux profs depuis 10 ans. Aucune question n\'est niaiseuse.' },
+            { id: 't8', name: 'Léa Fortin', role: 'Enseignante de sciences', group: 'sciences', level: '1er cycle', years: 2, room: 'Laboratoire 2',
+              mentor: false, open: true, availability: 'Après les cours', email: 'lea.fortin@ecole.exemple',
+              tags: ['Sciences', 'Laboratoires', 'Nouvelle aussi!'],
+              helpWith: 'Se soutenir entre nouveaux : on partage nos bons coups et nos mauvais jours.',
+              bio: 'Deuxième année ici. On pourrait créer un groupe de nouveaux profs?' },
+            { id: 't9', name: 'Mathieu Roy', role: 'Enseignant d\'arts plastiques', group: 'arts', level: '2e cycle', years: 12, room: 'Local d\'arts 015',
+              mentor: false, open: false, availability: 'Jeudi après-midi', email: 'mathieu.roy@ecole.exemple',
+              tags: ['Arts', 'Exposition', 'Décor de classe'],
+              helpWith: 'Rendre ta classe accueillante avec presque rien.',
+              bio: 'Je prépare l\'expo de fin d\'année : toutes les classes peuvent participer.' },
+        ];
+
+        const RESOURCES = [
+            { id: 'r1', title: 'Guide de survie : première semaine', type: 'guide', group: 'soutien', author: 'François Bouchard',
+              desc: 'Codes de photocopieur, horaire des cloches, qui appeler pour quoi. Tout sur deux pages.', link: '' },
+            { id: 'r2', title: 'Planification annuelle de français, 1er cycle', type: 'planif', group: 'francais', author: 'Marie Tremblay',
+              desc: 'Les étapes, les œuvres à lire et les évaluations déjà placées dans le calendrier.', link: '' },
+            { id: 'r3', title: 'Banque de grilles d\'évaluation', type: 'gabarit', group: 'sciences', author: 'Karim Benali',
+              desc: 'Des grilles modifiables pour les situations-problèmes et les laboratoires.', link: '' },
+            { id: 'r4', title: 'Le local de reprographie', type: 'lieu', group: 'soutien', author: 'Secrétariat',
+              desc: 'Local 105. Envoie tes demandes 48 h d\'avance, surtout en fin d\'étape!', link: '' },
+            { id: 'r5', title: 'Trousse de gestion de classe', type: 'outil', group: 'soutien', author: 'Sophie Lavoie',
+              desc: 'Routines, signaux non verbaux, plan de classe et gestion des transitions.', link: '' },
+            { id: 'r6', title: 'Communication avec les parents', type: 'gabarit', group: 'soutien', author: 'Direction',
+              desc: 'Modèles de courriels pour la rentrée, les retards de travaux et les bons coups.', link: '' },
+            { id: 'r7', title: 'Sorties éducatives : la procédure', type: 'guide', group: 'univers', author: 'Amélie Gagnon',
+              desc: 'Les formulaires, les délais et les autobus. Tout ce qui est compliqué, simplifié.', link: '' },
+        ];
+
+        const FILTERS = [
+            { key: 'all', label: 'Tout' },
+            { key: 'prof', label: '👩‍🏫 Collègues' },
+            { key: 'mentor', label: '🧭 Mentors' },
+            { key: 'res', label: '📚 Ressources' },
+            ...Object.entries(GROUPS).map(([key, g]) => ({ key: 'g:' + key, label: g.emoji + ' ' + g.label })),
+        ];
+
+        // ---------- Stockage local (facultatif, échoue silencieusement) ----------
+        const STORE_KEY = 'salle-des-profs-v1';
+        function loadStore() {
+            try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
+        }
+        function saveStore() {
+            try {
+                localStorage.setItem(STORE_KEY, JSON.stringify({ profile, connected, saved, passed, customResources }));
+            } catch { /* stockage indisponible */ }
+        }
+
+        const stored = loadStore();
+        let profile = stored.profile || null;
+        let connected = stored.connected || [];   // [{ id, super }]
+        let saved = stored.saved || [];           // [{ id, super }]
+        let passed = stored.passed || [];         // [id]
+        let customResources = stored.customResources || [];
+        let history = [];
+        let activeFilter = 'all';
+        let activeTab = 'connected';
+        let currentDeck = [];
+
+        function allItems() {
+            const teachers = TEACHERS.map((t, i) => ({ ...t, kind: 'prof', gradient: GRADIENTS[i % GRADIENTS.length] }));
+            const resources = [...customResources, ...RESOURCES].map(r => ({ ...r, kind: 'res' }));
+            // Une ressource toutes les deux cartes de collègues pour varier le paquet
+            const mixed = [];
+            let r = 0;
+            teachers.forEach((t, i) => {
+                mixed.push(t);
+                if (i % 2 === 1 && r < resources.length) mixed.push(resources[r++]);
+            });
+            return mixed.concat(resources.slice(r));
+        }
+        function findItem(id) { return allItems().find(i => i.id === id); }
+
+        // ---------- Utilitaires ----------
+        const $ = id => document.getElementById(id);
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+        const initials = name => name.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase();
+        const firstName = name => name.split(' ')[0];
+        const safeUrl = url => /^https?:\/\//i.test(url) ? url : '';
+
+        function showToast(message) {
+            const t = $('ToastBanner');
+            t.textContent = message;
+            t.classList.remove('opacity-0');
+            clearTimeout(showToast.timeout);
+            showToast.timeout = setTimeout(() => t.classList.add('opacity-0'), 1800);
+        }
+        function openModal(id) { $(id).classList.remove('hidden'); $(id).classList.add('flex'); }
+        function closeModal(id) { $(id).classList.add('hidden'); $(id).classList.remove('flex'); }
+        function anyModalOpen() {
+            return ['GalleryModal', 'MatchModal', 'ProfileModal', 'AddResourceModal'].some(id => !$(id).classList.contains('hidden'));
+        }
+
+        // ---------- Paquet ----------
+        function matchesFilter(item) {
+            if (activeFilter === 'all') return true;
+            if (activeFilter === 'prof') return item.kind === 'prof';
+            if (activeFilter === 'mentor') return item.kind === 'prof' && item.mentor;
+            if (activeFilter === 'res') return item.kind === 'res';
+            return item.group === activeFilter.slice(2);
+        }
+        function relevance(item) {
+            if (!profile) return 0;
+            let score = 0;
+            if (item.group === profile.group) score += 2;
+            if (item.level === profile.level) score += 1;
+            if (item.kind === 'prof' && item.mentor) score += 1;
+            return score;
+        }
+        function buildDeck() {
+            const swiped = new Set([...connected.map(c => c.id), ...saved.map(s => s.id), ...passed]);
+            currentDeck = allItems()
+                .filter(i => matchesFilter(i) && !swiped.has(i.id))
+                .map((item, idx) => ({ item, idx }))
+                .sort((a, b) => relevance(b.item) - relevance(a.item) || a.idx - b.idx)
+                .map(x => x.item);
+            renderStack();
+        }
+
+        function updateCounters() {
+            $('NetworkCountBadge').textContent = connected.length + saved.length;
+            $('UndoBtn').disabled = history.length === 0;
+            $('Greeting').textContent = profile ? `Salut ${profile.name}! 👋` : 'Salle des profs';
+            const profs = currentDeck.filter(i => i.kind === 'prof').length;
+            const res = currentDeck.length - profs;
+            $('DeckCounter').textContent = currentDeck.length
+                ? `${profs} collègue${profs > 1 ? 's' : ''} · ${res} ressource${res > 1 ? 's' : ''} à découvrir`
+                : 'Rien de nouveau ici';
+            $('EmptyState').classList.toggle('hidden', currentDeck.length > 0);
+            $('EmptyState').classList.toggle('flex', currentDeck.length === 0);
+        }
+
+        function teacherCardHtml(t) {
+            const g = GROUPS[t.group];
+            return `
+                <div class="absolute inset-0 bg-gradient-to-br ${t.gradient}"></div>
+                <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle at 20% 20%, white 0, transparent 40%), radial-gradient(circle at 80% 60%, white 0, transparent 35%)"></div>
+                <div class="absolute top-4 left-4 right-4 flex items-center justify-between gap-2">
+                    <span class="px-3 py-1 rounded-full bg-slate-950/40 backdrop-blur-md border border-white/20 text-xs font-semibold">${g.emoji} ${esc(g.label)}</span>
+                    ${t.mentor ? '<span class="px-3 py-1 rounded-full bg-sky-500/90 text-xs font-bold"><i class="fa-solid fa-compass mr-1"></i>Mentor</span>' : ''}
+                </div>
+                <div class="absolute inset-x-0 top-[15%] flex justify-center">
+                    <div class="w-32 h-32 rounded-full bg-white/20 backdrop-blur-sm border-4 border-white/40 flex items-center justify-center text-5xl font-extrabold tracking-tight shadow-2xl">${esc(initials(t.name))}</div>
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+                ${stampsHtml('SALUT!', 'MENTOR')}
+                <div class="absolute bottom-0 inset-x-0 p-5">
+                    <h2 class="text-2xl font-extrabold tracking-tight leading-tight">${esc(t.name)}</h2>
+                    <p class="text-sm font-medium text-slate-200 mb-2">${esc(t.role)} · ${esc(t.level)}</p>
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-300 mb-3">
+                        <span><i class="fa-solid fa-door-open text-emerald-400 mr-1"></i>${esc(t.room)}</span>
+                        <span><i class="fa-solid fa-award text-amber-400 mr-1"></i>${t.years} an${t.years > 1 ? 's' : ''} d'expérience</span>
+                        <span><i class="fa-solid fa-mug-hot text-sky-400 mr-1"></i>${esc(t.availability)}</span>
+                    </div>
+                    <div class="rounded-2xl bg-white/10 border border-white/10 px-3 py-2 mb-3">
+                        <p class="text-[10px] uppercase tracking-wider font-bold text-emerald-300 mb-0.5">Je peux t'aider avec</p>
+                        <p class="text-xs text-slate-100 leading-relaxed">${esc(t.helpWith)}</p>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${t.tags.map(tag => `<span class="px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] text-slate-200">${esc(tag)}</span>`).join('')}
+                    </div>
+                </div>`;
+        }
+
+        function resourceCardHtml(r) {
+            const type = RESOURCE_TYPES[r.type] || RESOURCE_TYPES.outil;
+            const g = GROUPS[r.group] || GROUPS.soutien;
+            return `
+                <div class="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900"></div>
+                <div class="absolute -top-10 -right-10 w-56 h-56 rounded-full bg-amber-400/15 blur-2xl"></div>
+                <div class="absolute top-4 left-4 right-4 flex items-center justify-between gap-2">
+                    <span class="px-3 py-1 rounded-full bg-amber-400/90 text-slate-950 text-xs font-bold"><i class="fa-solid ${type.icon} mr-1"></i>${esc(type.label)}</span>
+                    <span class="px-3 py-1 rounded-full bg-slate-950/40 border border-white/15 text-xs font-semibold">${g.emoji} ${esc(g.label)}</span>
+                </div>
+                <div class="absolute inset-x-0 top-[17%] flex justify-center">
+                    <div class="w-28 h-28 rounded-3xl bg-amber-400/15 border-2 border-amber-400/40 flex items-center justify-center rotate-3">
+                        <i class="fa-solid ${type.icon} text-5xl text-amber-300"></i>
+                    </div>
+                </div>
+                ${stampsHtml('GARDER', 'ESSENTIEL')}
+                <div class="absolute bottom-0 inset-x-0 p-5">
+                    <p class="text-[10px] uppercase tracking-wider font-bold text-amber-300 mb-1">Ressource</p>
+                    <h2 class="text-2xl font-extrabold tracking-tight leading-tight mb-2">${esc(r.title)}</h2>
+                    <p class="text-sm text-slate-300 leading-relaxed mb-3">${esc(r.desc)}</p>
+                    <p class="text-xs text-slate-400"><i class="fa-solid fa-share-nodes mr-1"></i>Partagé par ${esc(r.author)}</p>
+                </div>`;
+        }
+
+        function stampsHtml(likeLabel, superLabel) {
+            return `
+                <div class="stamp stamp-like absolute top-16 left-6 border-emerald-400 text-emerald-400 -rotate-12">${likeLabel}</div>
+                <div class="stamp stamp-nope absolute top-16 right-6 border-slate-300 text-slate-300 rotate-12">PASSER</div>
+                <div class="stamp stamp-super absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-sky-400 text-sky-400 -rotate-6">${superLabel}</div>`;
+        }
+
+        function renderStack() {
+            const stack = $('CardStack');
+            stack.innerHTML = '';
+            updateCounters();
+            const visible = currentDeck.slice(0, 3).reverse();
+            visible.forEach((item, idx) => {
+                const isTop = idx === visible.length - 1;
+                const depth = visible.length - 1 - idx;
+                const card = document.createElement('div');
+                card.className = 'swipe-card rounded-3xl overflow-hidden bg-slate-900 border border-slate-800/90 cursor-grab active:cursor-grabbing';
+                if (!isTop) {
+                    card.style.transform = `scale(${1 - depth * 0.045}) translateY(${depth * 12}px)`;
+                    card.style.pointerEvents = 'none';
+                }
+                card.innerHTML = item.kind === 'prof' ? teacherCardHtml(item) : resourceCardHtml(item);
+                if (isTop) attachDrag(card, item);
+                stack.appendChild(card);
+            });
+        }
+
+        // Pointer events + capture : un seul jeu d'écouteurs par carte, supprimé avec elle.
+        function attachDrag(card, item) {
+            let startX = 0, startY = 0, dx = 0, dy = 0, dragging = false;
+            const like = card.querySelector('.stamp-like');
+            const nope = card.querySelector('.stamp-nope');
+            const sup = card.querySelector('.stamp-super');
+            const setStamps = (l, n, s) => { like.style.opacity = l; nope.style.opacity = n; sup.style.opacity = s; };
+
+            card.addEventListener('pointerdown', e => {
+                dragging = true;
+                card.setPointerCapture(e.pointerId);
+                card.classList.remove('animating');
+                startX = e.clientX; startY = e.clientY; dx = 0; dy = 0;
+            });
+            card.addEventListener('pointermove', e => {
+                if (!dragging) return;
+                dx = e.clientX - startX; dy = e.clientY - startY;
+                card.style.transform = `translate(${dx}px, ${dy}px) rotate(${dx * 0.06}deg)`;
+                const t = 110;
+                if (dx > 20) setStamps(Math.min(dx / t, 1), 0, 0);
+                else if (dx < -20) setStamps(0, Math.min(-dx / t, 1), 0);
+                else if (dy < -40) setStamps(0, 0, Math.min(-dy / t, 1));
+                else setStamps(0, 0, 0);
+            });
+            const end = () => {
+                if (!dragging) return;
+                dragging = false;
+                card.classList.add('animating');
+                if (dx > 100) completeSwipe('like', card, item);
+                else if (dx < -100) completeSwipe('nope', card, item);
+                else if (dy < -120 && Math.abs(dx) < 80) completeSwipe('super', card, item);
+                else { card.style.transform = ''; setStamps(0, 0, 0); }
+            };
+            card.addEventListener('pointerup', end);
+            card.addEventListener('pointercancel', end);
+        }
+
+        function completeSwipe(action, card, item) {
+            card.style.pointerEvents = 'none';
+            card.classList.add('animating');
+            const stamp = card.querySelector('.stamp-' + action);
+            if (stamp) stamp.style.opacity = 1;
+
+            if (action === 'like') card.style.transform = `translate(${window.innerWidth}px, 40px) rotate(28deg)`;
+            else if (action === 'super') card.style.transform = `translate(0px, -${window.innerHeight}px) scale(0.9)`;
+            else card.style.transform = `translate(-${window.innerWidth}px, 40px) rotate(-28deg)`;
+
+            if (action === 'nope') passed.push(item.id);
+            else if (item.kind === 'prof') connected.unshift({ id: item.id, super: action === 'super' });
+            else saved.unshift({ id: item.id, super: action === 'super' });
+
+            history.push({ action, id: item.id });
+            currentDeck.shift();
+            saveStore();
+
+            setTimeout(() => {
+                renderStack();
+                if (action !== 'nope') afterPositiveSwipe(action, item);
+            }, 260);
+        }
+
+        function afterPositiveSwipe(action, item) {
+            if (item.kind === 'res') {
+                showToast(action === 'super' ? `⭐ « ${item.title} » marqué essentiel` : `📚 Ressource sauvegardée`);
+                return;
+            }
+            // Démo : les collègues « ouverts » acceptent tout de suite (et les mentors acceptent les demandes de mentorat).
+            if (item.open || (action === 'super' && item.mentor)) showMatch(item, action === 'super');
+            else showToast(`👋 Demande envoyée à ${firstName(item.name)}`);
+        }
+
+        function showMatch(t, isMentoring) {
+            const me = profile ? profile.name : 'Toi';
+            const subject = isMentoring ? 'Demande de mentorat' : 'Un café pour faire connaissance?';
+            const body = `Bonjour ${firstName(t.name)},\n\nJe suis ${profile ? profile.name : '[ton nom]'}, nouvelle personne dans l'équipe. ` +
+                (isMentoring ? `Tu accepterais de m'accompagner pendant mes premiers mois? ` : `J'aimerais beaucoup qu'on se rencontre. `) +
+                `Est-ce que « ${t.availability} » te conviendrait?\n\nMerci!`;
+            const mailto = `mailto:${t.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            $('MatchContent').innerHTML = `
+                <p class="text-xs uppercase tracking-[0.2em] font-bold text-emerald-400 mb-3">${isMentoring ? 'Mentorat accepté' : 'Nouvelle connexion'}</p>
+                <h3 class="text-3xl font-extrabold mb-5">C'est un match! 🎉</h3>
+                <div class="flex items-center justify-center gap-3 mb-5">
+                    <div class="w-20 h-20 rounded-full bg-slate-800 border-4 border-emerald-400 flex items-center justify-center text-2xl font-extrabold">${esc(initials(me))}</div>
+                    <i class="fa-solid fa-handshake text-2xl text-emerald-400"></i>
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-br ${t.gradient} border-4 border-emerald-400 flex items-center justify-center text-2xl font-extrabold">${esc(initials(t.name))}</div>
+                </div>
+                <p class="text-sm text-slate-300 mb-1">${esc(firstName(t.name))} est disponible : <strong class="text-white">${esc(t.availability)}</strong></p>
+                <p class="text-xs text-slate-400 mb-6"><i class="fa-solid fa-door-open mr-1"></i>${esc(t.room)}</p>
+                <a href="${esc(mailto)}" class="block w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 font-bold text-sm mb-2.5">
+                    <i class="fa-solid fa-envelope mr-1.5"></i>Proposer un café
+                </a>
+                <button data-close="MatchModal" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold text-sm">Continuer à découvrir</button>`;
+            openModal('MatchModal');
+        }
+
+        function triggerButtonSwipe(action) {
+            const top = $('CardStack').lastElementChild;
+            if (!currentDeck.length || !top) return;
+            completeSwipe(action, top, currentDeck[0]);
+        }
+
+        function undo() {
+            const last = history.pop();
+            if (!last) return;
+            connected = connected.filter(c => c.id !== last.id);
+            saved = saved.filter(s => s.id !== last.id);
+            passed = passed.filter(id => id !== last.id);
+            saveStore();
+            buildDeck();
+            showToast('↩️ Annulé');
+        }
+
+        // ---------- Mon réseau ----------
+        const TABS = [
+            { key: 'connected', label: 'Collègues', list: () => connected },
+            { key: 'saved', label: 'Ressources', list: () => saved },
+            { key: 'passed', label: 'Passés', list: () => passed.map(id => ({ id })) },
+        ];
+
+        function renderGallery() {
+            $('GalleryTabs').innerHTML = TABS.map(tab => `
+                <button data-tab="${tab.key}" class="flex-1 py-2 rounded-xl font-semibold text-xs transition ${tab.key === activeTab ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-400 border border-slate-800'}">
+                    ${tab.label} (${tab.list().length})
+                </button>`).join('');
+
+            const entries = TABS.find(t => t.key === activeTab).list()
+                .map(e => ({ ...e, item: findItem(e.id) }))
+                .filter(e => e.item);
+            const listEl = $('GalleryList');
+            if (!entries.length) {
+                const msg = { connected: "Glisse à droite sur un·e collègue pour l'ajouter ici.",
+                    saved: 'Glisse à droite sur une ressource pour la garder ici.', passed: 'Rien de passé pour le moment.' }[activeTab];
+                listEl.innerHTML = `<div class="py-16 text-center text-slate-500"><i class="fa-regular fa-face-smile text-3xl mb-2 block"></i><p class="text-sm font-medium">${msg}</p></div>`;
+                return;
+            }
+            listEl.innerHTML = entries.map(({ item, super: isSuper }) => {
+                const isProf = item.kind === 'prof';
+                const avatar = isProf
+                    ? `<div class="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br ${item.gradient} flex items-center justify-center font-extrabold">${esc(initials(item.name))}</div>`
+                    : `<div class="w-12 h-12 shrink-0 rounded-2xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center"><i class="fa-solid ${(RESOURCE_TYPES[item.type] || RESOURCE_TYPES.outil).icon} text-amber-300"></i></div>`;
+                const title = isProf ? item.name : item.title;
+                const sub = isProf ? `${item.role} · ${item.room}` : `Partagé par ${item.author}`;
+                const link = safeUrl(item.link || '');
+                const action = activeTab === 'passed' ? '' : isProf
+                    ? `<a href="mailto:${esc(item.email)}" title="Écrire" class="w-9 h-9 shrink-0 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center hover:bg-emerald-500 hover:text-white"><i class="fa-solid fa-envelope text-sm"></i></a>`
+                    : link ? `<a href="${esc(link)}" target="_blank" rel="noopener" title="Ouvrir" class="w-9 h-9 shrink-0 rounded-full bg-amber-400/15 text-amber-300 flex items-center justify-center hover:bg-amber-400 hover:text-slate-950"><i class="fa-solid fa-arrow-up-right-from-square text-sm"></i></a>` : '';
+                return `
+                    <div class="flex items-center gap-3 p-3 rounded-2xl bg-slate-900 border border-slate-800">
+                        ${avatar}
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold truncate">${esc(title)} ${isSuper ? '<i class="fa-solid fa-star text-sky-400 text-xs"></i>' : ''}</p>
+                            <p class="text-xs text-slate-400 truncate">${esc(sub)}</p>
+                            ${isProf && activeTab === 'connected' ? `<p class="text-[11px] text-emerald-300/90 truncate"><i class="fa-solid fa-mug-hot mr-1"></i>${esc(item.availability)}</p>` : ''}
+                        </div>
+                        ${action}
+                        <button data-restore="${esc(item.id)}" title="Remettre dans le paquet" class="w-9 h-9 shrink-0 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white"><i class="fa-solid fa-rotate-left text-sm"></i></button>
+                    </div>`;
+            }).join('');
+        }
+
+        $('GalleryTabs').addEventListener('click', e => {
+            const btn = e.target.closest('[data-tab]');
+            if (!btn) return;
+            activeTab = btn.dataset.tab;
+            renderGallery();
+        });
+        $('GalleryList').addEventListener('click', e => {
+            const btn = e.target.closest('[data-restore]');
+            if (!btn) return;
+            const id = btn.dataset.restore;
+            connected = connected.filter(c => c.id !== id);
+            saved = saved.filter(s => s.id !== id);
+            passed = passed.filter(p => p !== id);
+            history = history.filter(h => h.id !== id);
+            saveStore();
+            buildDeck();
+            renderGallery();
+            showToast('Remis dans le paquet');
+        });
+
+        // ---------- Filtres ----------
+        function renderFilters() {
+            $('Filters').innerHTML = FILTERS.map(f => `
+                <button data-filter="${f.key}" class="px-3.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition ${f.key === activeFilter
+                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'}">${esc(f.label)}</button>`).join('');
+        }
+        $('Filters').addEventListener('click', e => {
+            const btn = e.target.closest('[data-filter]');
+            if (!btn) return;
+            activeFilter = btn.dataset.filter;
+            renderFilters();
+            buildDeck();
+        });
+
+        // ---------- Formulaires ----------
+        const groupOptions = Object.entries(GROUPS).map(([k, g]) => `<option value="${k}">${g.emoji} ${esc(g.label)}</option>`).join('');
+        $('ProfileGroup').innerHTML = groupOptions;
+        $('ResGroup').innerHTML = groupOptions;
+        $('ResType').innerHTML = Object.entries(RESOURCE_TYPES).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('');
+
+        $('ProfileBtn').addEventListener('click', () => {
+            if (profile) {
+                $('ProfileName').value = profile.name;
+                $('ProfileGroup').value = profile.group;
+                $('ProfileLevel').value = profile.level;
+            }
+            openModal('ProfileModal');
+        });
+        $('ProfileForm').addEventListener('submit', e => {
+            e.preventDefault();
+            profile = { name: $('ProfileName').value.trim(), group: $('ProfileGroup').value, level: $('ProfileLevel').value };
+            saveStore();
+            closeModal('ProfileModal');
+            buildDeck();
+            showToast('Profil enregistré : on a trié les collègues pour toi');
+        });
+
+        $('AddResourceBtn').addEventListener('click', () => openModal('AddResourceModal'));
+        $('AddResourceForm').addEventListener('submit', e => {
+            e.preventDefault();
+            customResources.unshift({
+                id: 'custom_' + Date.now(),
+                title: $('ResTitle').value.trim(),
+                type: $('ResType').value,
+                group: $('ResGroup').value,
+                link: safeUrl($('ResLink').value.trim()),
+                desc: $('ResDesc').value.trim() || 'Une ressource partagée par un·e collègue.',
+                author: profile ? profile.name : 'Toi',
+            });
+            saveStore();
+            e.target.reset();
+            closeModal('AddResourceModal');
+            buildDeck();
+            showToast('📚 Ressource ajoutée au paquet');
+        });
+
+        // ---------- Boutons et clavier ----------
+        $('NopeBtn').addEventListener('click', () => triggerButtonSwipe('nope'));
+        $('LikeBtn').addEventListener('click', () => triggerButtonSwipe('like'));
+        $('SuperBtn').addEventListener('click', () => triggerButtonSwipe('super'));
+        $('UndoBtn').addEventListener('click', undo);
+
+        const openGallery = () => { renderGallery(); openModal('GalleryModal'); };
+        $('ToggleGalleryBtn').addEventListener('click', openGallery);
+        $('EmptyViewNetworkBtn').addEventListener('click', openGallery);
+        $('ResetDeckBtn').addEventListener('click', () => {
+            passed = [];
+            history = [];
+            saveStore();
+            buildDeck();
+            showToast('Paquet remélangé (ton réseau est conservé)');
+        });
+
+        document.addEventListener('click', e => {
+            const btn = e.target.closest('[data-close]');
+            if (btn) closeModal(btn.dataset.close);
+        });
+
+        window.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                ['MatchModal', 'GalleryModal', 'ProfileModal', 'AddResourceModal'].forEach(closeModal);
+                return;
+            }
+            if (anyModalOpen()) return;
+            if (e.key === 'ArrowLeft') triggerButtonSwipe('nope');
+            if (e.key === 'ArrowRight') triggerButtonSwipe('like');
+            if (e.key === 'ArrowUp') triggerButtonSwipe('super');
+            if (e.key === 'Backspace') undo();
+        });
+
+        // ---------- Démarrage ----------
+        renderFilters();
+        buildDeck();
+        if (!profile) openModal('ProfileModal');
+    </script>
+</body>
+</html>
