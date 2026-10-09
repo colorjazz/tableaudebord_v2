@@ -87,7 +87,10 @@ nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 700; }
 .photo-hit .cam { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
   color: var(--accent-fg); display: grid; place-items: center; border: 2px solid var(--surface); }
 .photo-hit:hover .avatar, .photo-hit:focus-within .avatar { filter: brightness(.9); }
-.sr-file { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+/* Le vrai champ fichier recouvre la zone touchée : sur téléphone, le toucher arrive directement sur lui. */
+.file-hit { position: relative; display: inline-flex; overflow: hidden; }
+.file-hit input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 100px; z-index: 2; }
+.paste { width: 100%; border: 1px dashed var(--line); background: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: 13px; resize: none; }
 .fiche-preview { position: relative; height: 500px; display: block; width: 100%; border: 0; padding: 0; background: none; text-align: left; }
 .res-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none;
   background: color-mix(in srgb, var(--chalk) 18%, transparent); color: var(--chalk); }
@@ -800,13 +803,15 @@ function profilSheet(roleHint) {
       <label><input type="radio" name="role" id="RoleNouveau" value="nouveau"${role === 'nouveau' ? ' checked' : ''}><b>Nouveau prof</b><span class="small muted">Je découvre l'école</span></label>
       <label><input type="radio" name="role" id="RoleMentor" value="mentor"${role === 'mentor' ? ' checked' : ''}><b>Mentor</b><span class="small muted">J'offre mon aide</span></label></div>`}
     <div class="photo-pick">
-      <label class="photo-hit" for="FPhoto" title="Choisir une photo"><span id="PhotoPreview">${avatar(S.uid, m.nom || '?', m.photo)}</span><span class="cam">${ico('camera', 15)}</span></label>
-      <input id="FPhoto" class="sr-file" type="file" accept="image/*" aria-label="Choisir une photo">
-      <div class="stack" style="gap:6px"><span class="small" style="font-weight:700">Photo</span>
+      <span class="photo-hit file-hit" style="overflow:visible"><span id="PhotoPreview">${avatar(S.uid, m.nom || '?', m.photo)}</span><span class="cam">${ico('camera', 15)}</span>
+        <input id="FPhoto" type="file" accept="image/*" aria-label="Choisir une photo"></span>
+      <div class="stack" style="gap:6px;min-width:0;flex:1"><span class="small" style="font-weight:700">Photo</span>
         <div class="row" style="flex-wrap:wrap">
-          <button type="button" class="btn sm ghost" id="FPhotoBtn">${ico('camera', 14)} Choisir une photo</button>
+          <span class="btn sm ghost file-hit">${ico('camera', 14)} Choisir une photo<input id="FPhoto2" type="file" accept="image/*" aria-label="Choisir une photo"></span>
           <button type="button" class="btn sm ghost" id="FPhotoDel"${okPhoto(m.photo) ? '' : ' hidden'}>Retirer</button></div>
         <small class="muted small">Elle apparaît sur ta carte et dans les jumelages.</small></div></div>
+    <label class="field"><span class="small muted" style="font-weight:400">Rien ne s'ouvre? Copie une photo dans ta galerie, puis colle-la ici (appui long, Coller).</span>
+      <textarea id="FPaste" class="paste" rows="1" placeholder="Coller une photo ici" aria-label="Coller une photo"></textarea></label>
     <label class="field"><span>Prénom et nom</span><input id="FNom" name="nom" required maxlength="60" value="${v('nom')}" placeholder="Alex Gagnon"></label>
     <div class="grid2">
       <label class="field"><span>École</span><select id="FEcole" name="ecoleId"><option value="">Choisis ton école</option>${S.ecoles.map(e => `<option value="${esc(e.id)}"${e.id === m.ecoleId ? ' selected' : ''}>${esc(e.nom)}</option>`).join('')}</select></label>
@@ -840,15 +845,20 @@ function profilSheet(roleHint) {
   $('ProfilForm').addEventListener('change', sync); sync();
   pendingPhoto = undefined;
   const preview = p => { $('PhotoPreview').innerHTML = avatar(S.uid, $('FNom').value || m.nom || '?', p); $('FPhotoDel').hidden = !okPhoto(p); };
-  $('FPhoto').addEventListener('change', async e => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    try { pendingPhoto = await shrinkPhoto(file); preview(pendingPhoto); }
-    catch { const er = $('FErr'); er.textContent = "Cette image n'a pas pu être lue. Essaie une photo JPEG ou PNG."; er.hidden = false; }
-    e.target.value = '';
+  const useFile = async file => {
+    const er = $('FErr');
+    if (!file || !/^image\//.test(file.type || 'image/')) { er.textContent = "Ce fichier n'est pas une image."; er.hidden = false; return; }
+    try { pendingPhoto = await shrinkPhoto(file); preview(pendingPhoto); er.hidden = true; toast('Photo ajoutée. Enregistre pour la garder.'); }
+    catch { er.textContent = "Cette image n'a pas pu être lue. Essaie une photo JPEG ou PNG."; er.hidden = false; }
+  };
+  ['FPhoto', 'FPhoto2'].forEach(id => $(id).addEventListener('change', e => { useFile(e.target.files && e.target.files[0]); e.target.value = ''; }));
+  $('FPaste').addEventListener('paste', e => {
+    const items = [...(e.clipboardData?.items || [])];
+    const f = items.find(i => i.kind === 'file' && i.type.startsWith('image/'))?.getAsFile() || e.clipboardData?.files?.[0];
+    e.preventDefault(); e.target.value = '';
+    if (f) useFile(f); else { const er = $('FErr'); er.textContent = "Le presse-papiers ne contient pas d'image. Copie d'abord une photo."; er.hidden = false; }
   });
   $('FPhotoDel').addEventListener('click', () => { pendingPhoto = ''; preview(''); });
-  $('FPhotoBtn').addEventListener('click', () => $('FPhoto').click());
 }
 
 // Recadre au format de la carte (4:5) et compresse en JPEG pour tenir dans la fiche.
