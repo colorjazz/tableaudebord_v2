@@ -269,11 +269,13 @@ function writeError(err) {
 }
 
 // ---------- État ----------
+// Pour l'instant, seule la vue « nouveau prof » est offerte. Mettre à false pour rouvrir les vues IP et mentor.
+const SEULEMENT_NOUVEAU = true;
 let db = null, user = null;
 const S = {
   phase: 'loading', uid: null, isIP: false, loaded: new Set(),
   ecoles: [], membres: {}, ressources: {}, demandes: {}, reponses: {}, etat: { passes: [], gardees: [] },
-  view: null, tab: null, filter: 'all', scope: 'ecole', resFilter: 'all', suiviEcole: null,
+  view: SEULEMENT_NOUVEAU ? 'nouveau' : null, tab: null, filter: 'all', scope: 'ecole', resFilter: 'all', suiviEcole: null,
   history: [], dragging: false, pending: false,
 };
 
@@ -383,7 +385,7 @@ function renderHeader() {
   if (v === 'ip') parts.push(`${S.ecoles.length} école${S.ecoles.length > 1 ? 's' : ''}`);
   $('Sub').textContent = S.phase === 'ready' ? (m && v !== 'ip' ? `Salut ${first(m.nom)} · ` : '') + parts.join(' · ') : S.phase === 'offline' ? 'Hors ligne' : 'Chargement…';
   let extra = '';
-  if (S.phase === 'ready' && S.isIP) {
+  if (S.phase === 'ready' && S.isIP && !SEULEMENT_NOUVEAU) {
     extra += `<select class="viewas" id="ViewAs" aria-label="Voir l'application comme">
       <option value="ip"${v === 'ip' ? ' selected' : ''}>Vue IP</option>
       <option value="mentor"${v === 'mentor' ? ' selected' : ''}>Voir comme mentor</option>
@@ -412,7 +414,7 @@ function renderWelcome(v) {
   }
   return `<div class="empty" style="padding-top:20px">
     <h3>Bienvenue dans la salle des profs</h3>
-    <p>Les nouveaux profs découvrent les mentors et les ressources de leur école. Les profs d'expérience y affichent l'aide qu'ils offrent.</p>
+    <p>${SEULEMENT_NOUVEAU ? "Découvre les collègues prêts à t'aider et les ressources de ton école. Glisse à droite pour proposer un café." : "Les nouveaux profs découvrent les mentors et les ressources de leur école. Les profs d'expérience y affichent l'aide qu'ils offrent."}</p>
     <button class="btn" data-act="profil" data-role="${v || ''}">Créer mon profil</button></div>`;
 }
 
@@ -529,7 +531,7 @@ function renderRessources() {
             ${link ? `<a class="btn sm ghost" href="${esc(link)}" target="_blank" rel="noopener">${ico('link', 14)} Ouvrir</a>` : ''}
             ${v === 'nouveau' ? `<button class="btn sm ${k ? '' : 'ghost'}" data-act="garder" data-key="${esc(r.key)}">${k ? ico('check', 14) + ' Gardée' : 'Garder'}</button>` : ''}
             ${mine ? `<button class="btn sm ghost" data-act="ressource" data-id="${esc(r.id)}">${ico('edit', 14)} Modifier</button>` : ''}
-            ${mine || S.isIP ? `<button class="btn sm ghost" data-act="del-ressource" data-key="${esc(r.key)}">${ico('trash', 14)} Supprimer</button>` : ''}
+            ${mine || (S.isIP && !SEULEMENT_NOUVEAU) ? `<button class="btn sm ghost" data-act="del-ressource" data-key="${esc(r.key)}">${ico('trash', 14)} Supprimer</button>` : ''}
           </div></div></div>`;
     }).join('') || `<div class="empty"><h3>Aucune ressource ici</h3><p>Partage un guide, une planification ou un gabarit qui t'a aidé. Il apparaîtra dans le paquet des nouveaux profs.</p></div>`}
   </div>`;
