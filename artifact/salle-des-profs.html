@@ -83,7 +83,12 @@ nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 700; }
 .card .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .photo-pick { display: flex; align-items: center; gap: 14px; }
 .photo-pick .avatar { width: 72px; height: 72px; font-size: 24px; }
-.photo-pick input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.photo-hit { position: relative; display: block; border-radius: 50%; cursor: pointer; flex: none; }
+.photo-hit .cam { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
+  color: var(--accent-fg); display: grid; place-items: center; border: 2px solid var(--surface); }
+.photo-hit:hover .avatar, .photo-hit:focus-within .avatar { filter: brightness(.9); }
+.sr-file { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+.fiche-preview { position: relative; height: 500px; display: block; width: 100%; border: 0; padding: 0; background: none; text-align: left; }
 .res-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none;
   background: color-mix(in srgb, var(--chalk) 18%, transparent); color: var(--chalk); }
 .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
@@ -226,6 +231,7 @@ const P = {
   coffee: '<path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><path d="M6 2v2M10 2v2M14 2v2"/>',
   door: '<path d="M13 4h3a2 2 0 0 1 2 2v14M2 20h20M13 20V3.5a.5.5 0 0 0-.62-.49l-6 1.5A.5.5 0 0 0 6 5v15"/><path d="M10 12h.01"/>',
   award: '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
 };
 const ico = (n, s = 20, fill = false) =>
@@ -521,7 +527,8 @@ function renderFiche() {
   return `<div class="stack">
     <div class="section-head"><h2>Ma fiche d'offre d'aide</h2><button class="btn sm" data-act="profil">${ico('edit', 16)} Modifier</button></div>
     <p class="small muted">Voici ce que les nouveaux profs de ${esc(ecoleNom(m.ecoleId))} voient en glissant.</p>
-    <div style="position:relative;height:500px">${cardHtml({ kind: 'prof', uid: S.uid, key: 'apercu', ...m }, true)}</div>
+    <button class="fiche-preview" data-act="profil" aria-label="Modifier ma fiche et ma photo">${cardHtml({ kind: 'prof', uid: S.uid, key: 'apercu', ...m }, true)}</button>
+    ${okPhoto(m.photo) ? '' : `<button class="btn ghost" data-act="profil">${ico('camera', 16)} Ajouter ma photo</button>`}
     <div class="item"><div class="grow"><p class="title">Mentorat</p>
       <p class="small muted">${m.mentorat ? `${a} sur ${m.places || 0} places occupées` : 'Tu offres seulement des rencontres café'}</p></div>
       <span class="pill ${m.autoAccept ? 'ok' : ''}">${m.autoAccept ? 'Acceptation automatique' : 'Tu approuves chaque demande'}</span></div>
@@ -661,7 +668,7 @@ function cardHtml(it, still = false) {
   const a = it.exemple ? 0 : mentoratsActifs(it.uid);
   const places = it.mentorat ? `<span class="tag">${Math.max(0, (it.places || 0) - a)} place${(it.places || 0) - a > 1 ? 's' : ''} de mentorat</span>` : '';
   const tags = Array.isArray(it.tags) ? it.tags : [];
-  return `<div class="card"${still ? ' style="cursor:default"' : ''} data-key="${esc(it.key)}">
+  return `<div class="card"${still ? ' style="cursor:pointer"' : ''} data-key="${esc(it.key)}">
     <div class="bgfx" style="background:${grad(it.uid)}"></div>
     ${okPhoto(it.photo) ? `<img class="photo" src="${it.photo}" alt="" draggable="false">` : ''}
     <div class="top"><span class="tag">${esc(GROUPS[it.matiere] || '')}</span><span class="row" style="gap:6px">${it.exemple ? '<span class="tag">Exemple</span>' : ''}${it.mentorat ? '<span class="tag gold">Mentor</span>' : ''}</span></div>
@@ -792,10 +799,12 @@ function profilSheet(roleHint) {
     ${lockRole ? `<input type="hidden" name="role" value="${role}">` : `<div class="roles" role="radiogroup" aria-label="Je suis">
       <label><input type="radio" name="role" id="RoleNouveau" value="nouveau"${role === 'nouveau' ? ' checked' : ''}><b>Nouveau prof</b><span class="small muted">Je découvre l'école</span></label>
       <label><input type="radio" name="role" id="RoleMentor" value="mentor"${role === 'mentor' ? ' checked' : ''}><b>Mentor</b><span class="small muted">J'offre mon aide</span></label></div>`}
-    <div class="photo-pick"><span id="PhotoPreview">${avatar(S.uid, m.nom || '?', m.photo)}</span>
+    <div class="photo-pick">
+      <label class="photo-hit" for="FPhoto" title="Choisir une photo"><span id="PhotoPreview">${avatar(S.uid, m.nom || '?', m.photo)}</span><span class="cam">${ico('camera', 15)}</span></label>
+      <input id="FPhoto" class="sr-file" type="file" accept="image/*" aria-label="Choisir une photo">
       <div class="stack" style="gap:6px"><span class="small" style="font-weight:700">Photo</span>
         <div class="row" style="flex-wrap:wrap">
-          <label class="btn sm ghost" for="FPhoto">Choisir une photo<input id="FPhoto" type="file" accept="image/*"></label>
+          <button type="button" class="btn sm ghost" id="FPhotoBtn">${ico('camera', 14)} Choisir une photo</button>
           <button type="button" class="btn sm ghost" id="FPhotoDel"${okPhoto(m.photo) ? '' : ' hidden'}>Retirer</button></div>
         <small class="muted small">Elle apparaît sur ta carte et dans les jumelages.</small></div></div>
     <label class="field"><span>Prénom et nom</span><input id="FNom" name="nom" required maxlength="60" value="${v('nom')}" placeholder="Alex Gagnon"></label>
@@ -839,6 +848,7 @@ function profilSheet(roleHint) {
     e.target.value = '';
   });
   $('FPhotoDel').addEventListener('click', () => { pendingPhoto = ''; preview(''); });
+  $('FPhotoBtn').addEventListener('click', () => $('FPhoto').click());
 }
 
 // Recadre au format de la carte (4:5) et compresse en JPEG pour tenir dans la fiche.
