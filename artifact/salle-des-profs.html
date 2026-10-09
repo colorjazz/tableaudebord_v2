@@ -433,7 +433,19 @@ function renderEcoles() {
     <div class="section-head"><h2>Écoles</h2><button class="btn sm" data-act="ecole">${ico('plus', 16)} Ajouter</button></div>
     ${rows || `<div class="empty"><h3>Aucune école pour l'instant</h3><p>Ajoute les écoles de ton centre de services. Les profs choisiront la leur en créant leur profil.</p></div>`}
     <p class="small muted">Pour qu'un prof puisse créer sa fiche, partage cette page avec lui avec l'accès Contributeur.</p>
+    ${exampleIds().length ? `<div class="item"><div class="grow"><p class="title">Données d'exemple</p>
+      <p class="small muted">${exampleIds().length} fiches de démonstration. Retire-les avant d'inviter les profs.</p></div>
+      <button class="btn sm ghost" data-act="del-exemples">${ico('trash', 14)} Retirer</button></div>` : ''}
   </div>`;
+}
+
+// Les fiches de démonstration ont toutes un identifiant qui commence par « ex- ».
+function exampleIds() {
+  const ex = id => String(id).startsWith('ex-');
+  return [
+    ...S.ecoles.filter(e => ex(e.id)).map(e => 'ecoles/' + e.id),
+    ...['membres', 'ressources', 'demandes', 'reponses'].flatMap(c => Object.keys(S[c]).filter(ex).map(id => c + '/' + id)),
+  ];
 }
 
 // ----- IP : suivi des jumelages -----
@@ -974,6 +986,11 @@ const ACTIONS = {
       () => remove(`membres/${d.id}`).then(() => toast('Fiche retirée')));
   },
   ressource: d => ressourceSheet(d.id),
+  'del-exemples': () => {
+    const ids = exampleIds();
+    confirmSheet('Retirer les données d’exemple?', `${ids.length} fiches de démonstration seront supprimées pour tout le monde. Les vraies fiches restent.`, 'Retirer',
+      () => Promise.all(ids.map(remove)).then(() => toast('Données d’exemple retirées')));
+  },
   'del-ressource': d => {
     const [, auteur, id] = d.key.split(':');
     const items = (S.ressources[auteur] || []).filter(x => x.id !== id);
