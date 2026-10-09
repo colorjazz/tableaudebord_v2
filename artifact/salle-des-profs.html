@@ -1,0 +1,955 @@
+<title>Salle des profs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<style>
+/* Layout : une colonne d'appli (header, vue, barre d'onglets) ; cartes « tableau vert » à glisser. */
+:root {
+  --bg: #f1f5f1; --surface: #ffffff; --surface-2: #e5ece6; --line: #cfdbd1;
+  --fg: #15201a; --muted: #56675d;
+  --accent: #1b6a50; --accent-fg: #ffffff; --chalk: #b9790b;
+  --ok: #1c7a4b; --warn: #a3620a; --danger: #b13f2c;
+  --shadow: 0 18px 34px -16px rgba(16, 40, 30, .45);
+  --font-display: 'Bricolage Grotesque', 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --font-body: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d1411; --surface: #151f1a; --surface-2: #1c2822; --line: #2a3a31;
+  --fg: #e7efe9; --muted: #9cb0a4;
+  --accent: #52b893; --accent-fg: #08120d; --chalk: #f0bd55;
+  --ok: #5cc48d; --warn: #e9a94b; --danger: #ec8270;
+  --shadow: 0 18px 34px -16px rgba(0, 0, 0, .8); color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0d1411; --surface: #151f1a; --surface-2: #1c2822; --line: #2a3a31;
+  --fg: #e7efe9; --muted: #9cb0a4;
+  --accent: #52b893; --accent-fg: #08120d; --chalk: #f0bd55;
+  --ok: #5cc48d; --warn: #e9a94b; --danger: #ec8270;
+  --shadow: 0 18px 34px -16px rgba(0, 0, 0, .8); color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font-body); overflow: hidden; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+#app { height: 100%; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; }
+header.top { display: flex; align-items: center; gap: 12px; padding: 14px 16px 8px; }
+.mark { width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: var(--accent-fg);
+  display: grid; place-items: center; font: 800 16px var(--font-display); flex: none; }
+.brand { min-width: 0; flex: 1; }
+.brand h1 { font-size: 19px; }
+.brand p { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface);
+  display: grid; place-items: center; flex: none; }
+.viewas { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 10px; font-size: 13px; max-width: 150px; }
+
+main { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 16px 16px; }
+main.deck-mode { overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+nav.tabs { display: flex; border-top: 1px solid var(--line); background: var(--surface);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); }
+nav.tabs button { flex: 1; border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 12px; color: var(--muted); padding: 6px 2px; border-radius: 10px; position: relative; }
+nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 700; }
+.badge { position: absolute; top: 2px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; font-variant-numeric: tabular-nums; }
+
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; flex: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 13px; white-space: nowrap; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 700; }
+
+.btn { border: 0; border-radius: 12px; padding: 11px 16px; font-weight: 700; background: var(--accent); color: var(--accent-fg);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn.ghost { background: var(--surface-2); color: var(--fg); }
+.btn.danger { background: var(--danger); color: #fff; }
+.btn.sm { padding: 7px 12px; font-size: 13px; border-radius: 10px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.row { display: flex; align-items: center; gap: 10px; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.section-head h2 { font-size: 18px; }
+
+.item { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.item .grow { min-width: 0; flex: 1; }
+.item .title { font-weight: 700; overflow-wrap: anywhere; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 800 15px var(--font-display); flex: none; }
+.res-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none;
+  background: color-mix(in srgb, var(--chalk) 18%, transparent); color: var(--chalk); }
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: var(--surface-2); color: var(--muted); }
+.pill.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.pill.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.pill.danger { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.contact { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; display: grid; gap: 2px; }
+.contact .sel { user-select: all; font-weight: 700; overflow-wrap: anywhere; }
+
+.empty { text-align: center; padding: 36px 16px; color: var(--muted); display: grid; gap: 10px; justify-items: center; }
+.empty h3 { color: var(--fg); font-size: 18px; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.tile b { display: block; font: 800 26px var(--font-display); font-variant-numeric: tabular-nums; }
+.tile.alert b { color: var(--danger); }
+.tile span { font-size: 12px; color: var(--muted); }
+
+/* Paquet de cartes */
+.stack-wrap { position: relative; flex: 1; min-height: 0; }
+.card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; color: #fff; touch-action: none; user-select: none;
+  box-shadow: var(--shadow); transform-origin: 50% 100%; will-change: transform; cursor: grab; }
+.card.animating { transition: transform .35s cubic-bezier(.175, .885, .32, 1.15); }
+.card .bgfx { position: absolute; inset: 0; }
+.card .scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(6, 12, 9, .96) 0%, rgba(6, 12, 9, .55) 55%, rgba(6, 12, 9, 0) 85%); }
+.card .top { position: absolute; top: 14px; left: 14px; right: 14px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.card .tag { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .25); }
+.card .tag.gold { background: #f0bd55; color: #2a1c02; border-color: #f0bd55; }
+.card .big { position: absolute; left: 0; right: 0; top: 13%; display: grid; place-items: center; }
+.card .big .ini { width: 120px; height: 120px; border-radius: 50%; border: 4px solid rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .14);
+  display: grid; place-items: center; font: 800 46px var(--font-display); }
+.card .big .resi { width: 108px; height: 108px; border-radius: 26px; border: 2px solid rgba(240, 189, 85, .6); background: rgba(240, 189, 85, .14);
+  display: grid; place-items: center; color: #f0bd55; transform: rotate(3deg); }
+.card .body { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px; display: grid; gap: 8px; }
+.card h2 { font-size: 26px; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: #d5e2da; }
+.card .meta span { display: inline-flex; align-items: center; gap: 4px; }
+.card .help { background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .14); border-radius: 14px; padding: 8px 10px; font-size: 13px; }
+.card .help .k { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: #8fe0bd; }
+.card .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.card .tags span { font-size: 11px; background: rgba(0, 0, 0, .35); padding: 2px 8px; border-radius: 999px; }
+.stamp { position: absolute; border: 4px solid; border-radius: 10px; padding: 2px 12px; font: 800 26px var(--font-display); letter-spacing: .06em;
+  opacity: 0; pointer-events: none; text-transform: uppercase; }
+.stamp.like { top: 64px; left: 22px; color: #6fe0a8; transform: rotate(-12deg); }
+.stamp.nope { top: 64px; right: 22px; color: #e3e9e5; transform: rotate(12deg); }
+.stamp.super { top: 42%; left: 50%; color: #8cc0ff; transform: translate(-50%, -50%) rotate(-6deg); white-space: nowrap; }
+.actions { display: flex; justify-content: center; align-items: center; gap: 16px; flex: none; padding-bottom: 2px; }
+.round { border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--line); box-shadow: var(--shadow); }
+.round.l { width: 62px; height: 62px; }
+.round.s { width: 48px; height: 48px; }
+.round.yes { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.round.star { color: #3b82d6; border-color: color-mix(in srgb, #3b82d6 40%, transparent); }
+.round.undo { color: var(--warn); }
+.round:disabled { opacity: .35; pointer-events: none; }
+.hint { text-align: center; font-size: 12px; color: var(--muted); flex: none; }
+
+/* Feuilles (modales) */
+.sheet-back { position: fixed; inset: 0; background: rgba(5, 12, 9, .55); display: flex; align-items: flex-end; justify-content: center; z-index: 50; padding: 16px; }
+.sheet { width: 100%; max-width: 520px; max-height: 92%; overflow-y: auto; background: var(--surface); border-radius: 22px; padding: 20px; box-shadow: var(--shadow);
+  display: grid; gap: 14px; }
+@media (min-width: 640px) { .sheet-back { align-items: center; } }
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.sheet-head h2 { font-size: 21px; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field > span { font-size: 13px; font-weight: 700; }
+.field small { color: var(--muted); font-size: 12px; }
+.field input, .field select, .field textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 9px 11px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 420px) { .grid2 { grid-template-columns: 1fr; } }
+.roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.roles label { border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; cursor: pointer; }
+.roles label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.roles input { position: absolute; opacity: 0; pointer-events: none; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.check input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.match-hero { text-align: center; display: grid; gap: 12px; justify-items: center; }
+.match-hero h2 { font-size: 30px; }
+.pair { display: flex; align-items: center; gap: 12px; }
+.pair .avatar { width: 72px; height: 72px; font-size: 24px; border: 4px solid var(--accent); }
+
+#Toast { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 16px;
+  border-radius: 999px; font-size: 13px; font-weight: 700; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 60;
+  max-width: calc(100% - 32px); text-align: center; }
+#Toast.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .card.animating { transition: none; } #Toast { transition: none; } }
+</style>
+
+<div id="app">
+  <header class="top">
+    <div class="mark" aria-hidden="true">SP</div>
+    <div class="brand"><h1>Salle des profs</h1><p id="Sub">Chargement…</p></div>
+    <span id="HeadExtra" class="row"></span>
+  </header>
+  <main id="Main"></main>
+  <nav class="tabs" id="Tabs" hidden></nav>
+</div>
+<div id="SheetRoot"></div>
+<div id="Toast" role="status" aria-live="polite"></div>
+
+<script>
+// ---------- Référentiels ----------
+const GROUPS = {
+  francais: 'Français et langues', sciences: 'Maths et sciences', univers: 'Univers social',
+  arts: 'Arts et éduc. physique', soutien: 'Adaptation et soutien',
+};
+const LEVELS = ['1re secondaire', '2e secondaire', '3e secondaire', '4e secondaire', '5e secondaire', 'Adaptation scolaire', 'Primaire', 'Tous les niveaux'];
+const RTYPES = { guide: 'Guide', planif: 'Planification', gabarit: 'Gabarit', outil: 'Outil', lieu: "Lieu à l'école" };
+const GRADS = [['#1d6b52', '#0b2e23'], ['#2c5d9e', '#122a4c'], ['#8a4f1f', '#3b210b'], ['#6b3f8a', '#2c1840'], ['#1f6f78', '#0c3236'], ['#9a3b3b', '#461818']];
+
+// Exemples affichés seulement tant qu'aucun mentor réel n'est inscrit. Jamais enregistrés.
+const EXEMPLES = [
+  { kind: 'prof', exemple: true, key: 'ex:1', uid: 'ex1', nom: 'Marie Exemple', fonction: 'Enseignante de français', matiere: 'francais', niveau: '1re secondaire',
+    annees: 14, local: 'Local 214', dispo: 'Dîner mardi et jeudi', mentorat: true, places: 2,
+    aideAvec: 'Planifier ta première étape et corriger sans y passer tes soirées.', tags: ['Lecture', 'Gestion de classe'] },
+  { kind: 'res', exemple: true, key: 'ex:r1', titre: 'Guide de survie de la première semaine', type: 'guide', matiere: 'soutien',
+    desc: 'Codes du photocopieur, horaire des cloches, qui appeler pour quoi.', signature: 'Équipe d’insertion' },
+  { kind: 'prof', exemple: true, key: 'ex:2', uid: 'ex2', nom: 'Karim Exemple', fonction: 'Enseignant de mathématiques', matiere: 'sciences', niveau: '4e secondaire',
+    annees: 9, local: 'Local 308', dispo: 'Avant 8 h', mentorat: false, places: 0,
+    aideAvec: 'Les situations-problèmes et les grilles d’évaluation.', tags: ['Évaluation', 'Robotique'] },
+];
+
+// ---------- Icônes ----------
+const P = {
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  star: '<path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>',
+  heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
+  school: '<path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6M12 10h.01"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  chart: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  card: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M15 8h2M15 12h2M7 16h10"/>',
+  coffee: '<path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><path d="M6 2v2M10 2v2M14 2v2"/>',
+  door: '<path d="M13 4h3a2 2 0 0 1 2 2v14M2 20h20M13 20V3.5a.5.5 0 0 0-.62-.49l-6 1.5A.5.5 0 0 0 6 5v15"/><path d="M10 12h.01"/>',
+  award: '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+};
+const ico = (n, s = 20, fill = false) =>
+  `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="${fill ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
+
+// ---------- Utilitaires ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const initials = n => String(n || '?').trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase();
+const first = n => String(n || '').trim().split(/\s+/)[0] || 'Cette personne';
+const safeUrl = u => /^https?:\/\/\S+$/i.test(u || '') ? u : '';
+const hash = s => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+const grad = id => { const [a, b] = GRADS[hash(id) % GRADS.length]; return `linear-gradient(150deg, ${a}, ${b})`; };
+const avatar = (id, nom) => `<div class="avatar" style="background:${grad(id)}">${esc(initials(nom))}</div>`;
+const daysAgo = t => t ? Math.floor((Date.now() - t) / 864e5) : null;
+const uidShort = () => Math.random().toString(36).slice(2, 10);
+const options = (obj, sel) => Object.entries(obj).map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(v)}</option>`).join('');
+
+function toast(msg) {
+  const t = $('Toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function writeError(err) {
+  const code = err && err.code;
+  if (code === 'invalid_argument') toast("Tu n'as pas le droit de modifier ces données. Demande à l'équipe d'insertion l'accès Contributeur.");
+  else if (code === 'quota_exceeded') toast("L'espace de stockage est plein. L'équipe d'insertion doit supprimer d'anciennes fiches.");
+  else toast("L'enregistrement a échoué. Vérifie ta connexion et réessaie.");
+  console.warn(err);
+}
+
+// ---------- État ----------
+let db = null, user = null;
+const S = {
+  phase: 'loading', uid: null, isIP: false, loaded: new Set(),
+  ecoles: [], membres: {}, ressources: {}, demandes: {}, reponses: {}, etat: { passes: [], gardees: [] },
+  view: null, tab: null, filter: 'all', scope: 'ecole', resFilter: 'all', suiviEcole: null,
+  history: [], dragging: false, pending: false,
+};
+
+// Une écriture à la fois par document, toujours avec l'état complet le plus récent.
+const queues = {};
+function write(path, data) {
+  queues[path] = (queues[path] || Promise.resolve()).then(() => db.doc(path).set(data)).catch(writeError);
+  return queues[path];
+}
+function remove(path) {
+  queues[path] = (queues[path] || Promise.resolve()).then(() => db.doc(path).delete()).catch(writeError);
+  return queues[path];
+}
+
+// ---------- Données dérivées ----------
+const me = () => S.membres[S.uid];
+const view = () => S.view || (S.isIP ? 'ip' : me()?.role || null);
+const ecoleNom = id => S.ecoles.find(e => e.id === id)?.nom || 'École non précisée';
+const mentors = () => Object.entries(S.membres).filter(([, m]) => m.role === 'mentor').map(([uid, m]) => ({ uid, ...m }));
+const nouveaux = () => Object.entries(S.membres).filter(([, m]) => m.role === 'nouveau').map(([uid, m]) => ({ uid, ...m }));
+function allResources() {
+  return Object.entries(S.ressources).flatMap(([auteur, items]) =>
+    (items || []).map(it => ({ ...it, auteur, key: `r:${auteur}:${it.id}`, kind: 'res' })))
+    .sort((a, b) => (b.creeLe || 0) - (a.creeLe || 0));
+}
+// Statut d'une demande : réponse explicite du mentor, sinon acceptation automatique, sinon en attente.
+function statut(from, mentor) {
+  const d = S.demandes[from]?.[mentor];
+  if (!d) return null;
+  const r = S.reponses[mentor]?.[from];
+  if (r) return r;
+  return S.membres[mentor]?.autoAccept ? 'accepte' : 'attente';
+}
+function demandesRecues(mentor) {
+  return Object.entries(S.demandes).filter(([, v]) => v && v[mentor])
+    .map(([from, v]) => ({ from, ...v[mentor], statut: statut(from, mentor), membre: S.membres[from] }))
+    .filter(d => d.membre)
+    .sort((a, b) => (b.le || 0) - (a.le || 0));
+}
+function mentoratsActifs(mentor) {
+  return demandesRecues(mentor).filter(d => d.type === 'mentorat' && d.statut === 'accepte').length;
+}
+
+// ---------- Démarrage ----------
+async function boot() {
+  render();
+  if (!window.claude || !window.claude.use) { S.phase = 'offline'; return render(); }
+  [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+  if (!db || !user) { S.phase = 'offline'; return render(); }
+  [S.uid, S.isIP] = await Promise.all([user.id(), user.canEdit()]);
+  if (!S.uid) { S.phase = 'offline'; return render(); }
+  const done = k => { S.loaded.add(k); if (S.loaded.size === 6 && S.phase === 'loading') S.phase = 'ready'; render(); };
+  const fail = e => console.warn(e);
+  db.collection('ecoles').onSnapshot(s => {
+    S.ecoles = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr'));
+    done('ecoles');
+  }, fail);
+  db.collection('membres').onSnapshot(s => { S.membres = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); done('membres'); }, fail);
+  db.collection('ressources').onSnapshot(s => { S.ressources = Object.fromEntries(s.docs.map(d => [d.id, d.data().items || []])); done('ressources'); }, fail);
+  db.collection('demandes').onSnapshot(s => { S.demandes = Object.fromEntries(s.docs.map(d => [d.id, d.data().vers || {}])); done('demandes'); }, fail);
+  db.collection('reponses').onSnapshot(s => { S.reponses = Object.fromEntries(s.docs.map(d => [d.id, d.data().de || {}])); done('reponses'); }, fail);
+  db.doc(`data/users/${S.uid}/etat`).onSnapshot(d => {
+    const v = d.exists ? d.data() : {};
+    S.etat = { passes: [...(v.passes || [])], gardees: [...(v.gardees || [])] };
+    done('etat');
+  }, fail);
+}
+
+// ---------- Rendu ----------
+const TABS = {
+  ip: [['ecoles', 'Écoles', 'school'], ['suivi', 'Suivi', 'chart'], ['membres', 'Membres', 'users'], ['ressources', 'Ressources', 'book']],
+  mentor: [['fiche', 'Ma fiche', 'card'], ['demandes', 'Demandes', 'inbox'], ['ressources', 'Ressources', 'book']],
+  nouveau: [['decouvrir', 'Découvrir', 'compass'], ['reseau', 'Mon réseau', 'users'], ['ressources', 'Ressources', 'book']],
+};
+const ROLE_LABEL = { ip: 'Insertion professionnelle', mentor: 'Mentor', nouveau: 'Nouveau prof' };
+
+function render() {
+  if (S.dragging) { S.pending = true; return; }
+  const main = $('Main');
+  renderHeader();
+  if (S.phase === 'loading') { $('Tabs').hidden = true; main.className = ''; main.innerHTML = `<div class="empty"><p>Chargement de la salle des profs…</p></div>`; return; }
+  if (S.phase === 'offline') {
+    $('Tabs').hidden = true; main.className = '';
+    main.innerHTML = `<div class="empty"><h3>Connecte-toi pour entrer</h3><p>Ouvre ce lien dans claude.ai avec ton compte de l'école. Les fiches et les jumelages sont partagés avec toute l'équipe.</p></div>`;
+    return;
+  }
+  const v = view();
+  if (!v || ((v === 'mentor' || v === 'nouveau') && (!me() || me().role !== v))) { $('Tabs').hidden = true; main.className = ''; main.innerHTML = renderWelcome(v); return; }
+  const tabs = TABS[v];
+  if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
+  renderTabs(v, tabs);
+  if (S.tab === 'decouvrir') return renderDeck();
+  main.className = ''; main.dataset.sig = '';
+  const html = {
+    ecoles: renderEcoles, suivi: renderSuivi, membres: renderMembres, ressources: renderRessources,
+    fiche: renderFiche, demandes: renderDemandes, reseau: renderReseau,
+  }[S.tab]();
+  main.innerHTML = html;
+}
+
+function renderHeader() {
+  const v = S.phase === 'ready' ? view() : null;
+  const m = me();
+  const parts = [];
+  if (v) parts.push(ROLE_LABEL[v]);
+  if (m && v !== 'ip') parts.push(ecoleNom(m.ecoleId));
+  if (v === 'ip') parts.push(`${S.ecoles.length} école${S.ecoles.length > 1 ? 's' : ''}`);
+  $('Sub').textContent = S.phase === 'ready' ? (m && v !== 'ip' ? `Salut ${first(m.nom)} · ` : '') + parts.join(' · ') : S.phase === 'offline' ? 'Hors ligne' : 'Chargement…';
+  let extra = '';
+  if (S.phase === 'ready' && S.isIP) {
+    extra += `<select class="viewas" id="ViewAs" aria-label="Voir l'application comme">
+      <option value="ip"${v === 'ip' ? ' selected' : ''}>Vue IP</option>
+      <option value="mentor"${v === 'mentor' ? ' selected' : ''}>Voir comme mentor</option>
+      <option value="nouveau"${v === 'nouveau' ? ' selected' : ''}>Voir comme nouveau</option></select>`;
+  }
+  if (S.phase === 'ready' && m && v !== 'ip') extra += `<button class="icon-btn" data-act="profil" title="Mon profil" aria-label="Mon profil">${ico('user')}</button>`;
+  const he = $('HeadExtra');
+  if (he.dataset.html !== extra) { he.innerHTML = extra; he.dataset.html = extra; }
+}
+
+function renderTabs(v, tabs) {
+  const nav = $('Tabs'); nav.hidden = false;
+  const badges = {
+    demandes: v === 'mentor' ? demandesRecues(S.uid).filter(d => d.statut === 'attente').length : 0,
+    reseau: v === 'nouveau' ? Object.keys(S.demandes[S.uid] || {}).filter(id => statut(S.uid, id) === 'accepte' && S.membres[id]).length : 0,
+  };
+  nav.innerHTML = tabs.map(([k, label, i]) => `<button data-act="tab" data-tab="${k}"${S.tab === k ? ' aria-current="page"' : ''}>
+    ${ico(i, 22)}<span>${label}</span>${badges[k] ? `<span class="badge">${badges[k]}</span>` : ''}</button>`).join('');
+}
+
+function renderWelcome(v) {
+  if (!S.ecoles.length) {
+    return S.isIP
+      ? `<div class="empty"><h3>Crée d'abord une école</h3><p>Les profs choisiront leur école en s'inscrivant. Reviens à la vue IP pour en ajouter une.</p></div>`
+      : `<div class="empty"><h3>Bienvenue!</h3><p>L'équipe d'insertion professionnelle n'a pas encore créé ton école. Reviens dans quelques jours.</p></div>`;
+  }
+  return `<div class="empty" style="padding-top:20px">
+    <h3>Bienvenue dans la salle des profs</h3>
+    <p>Les nouveaux profs découvrent les mentors et les ressources de leur école. Les profs d'expérience y affichent l'aide qu'ils offrent.</p>
+    <button class="btn" data-act="profil" data-role="${v || ''}">Créer mon profil</button></div>`;
+}
+
+// ----- IP : écoles -----
+function renderEcoles() {
+  const rows = S.ecoles.map(e => {
+    const ms = mentors().filter(m => m.ecoleId === e.id).length;
+    const ns = nouveaux().filter(m => m.ecoleId === e.id);
+    const jum = ns.filter(n => Object.keys(S.demandes[n.uid] || {}).some(id => statut(n.uid, id) === 'accepte')).length;
+    return `<div class="item">
+      <div class="res-ico">${ico('school', 22)}</div>
+      <div class="grow"><p class="title">${esc(e.nom)}</p>
+        <p class="small muted">${esc(e.ville || '')}${e.ville ? ' · ' : ''}${ms} mentor${ms > 1 ? 's' : ''} · ${ns.length} nouveau${ns.length > 1 ? 'x' : ''} · ${jum} jumelé${jum > 1 ? 's' : ''}</p></div>
+      <button class="icon-btn" data-act="ecole" data-id="${esc(e.id)}" title="Modifier" aria-label="Modifier ${esc(e.nom)}">${ico('edit', 18)}</button>
+    </div>`;
+  }).join('');
+  return `<div class="stack">
+    <div class="section-head"><h2>Écoles</h2><button class="btn sm" data-act="ecole">${ico('plus', 16)} Ajouter</button></div>
+    ${rows || `<div class="empty"><h3>Aucune école pour l'instant</h3><p>Ajoute les écoles de ton centre de services. Les profs choisiront la leur en créant leur profil.</p></div>`}
+    <p class="small muted">Pour qu'un prof puisse créer sa fiche, partage cette page avec lui avec l'accès Contributeur.</p>
+  </div>`;
+}
+
+// ----- IP : suivi des jumelages -----
+function renderSuivi() {
+  if (!S.ecoles.length) return `<div class="empty"><h3>Rien à suivre encore</h3><p>Crée une école, puis invite les profs.</p></div>`;
+  const ecole = S.suiviEcole && S.ecoles.some(e => e.id === S.suiviEcole) ? S.suiviEcole : 'all';
+  const inE = m => ecole === 'all' || m.ecoleId === ecole;
+  const ns = nouveaux().filter(inE).map(n => {
+    const ids = Object.keys(S.demandes[n.uid] || {}).filter(id => S.membres[id]);
+    const st = ids.map(id => statut(n.uid, id));
+    const etat = st.includes('accepte') ? 'jumele' : st.includes('attente') ? 'attente' : 'seul';
+    return { ...n, etat, nb: ids.length };
+  }).sort((a, b) => ({ seul: 0, attente: 1, jumele: 2 })[a.etat] - ({ seul: 0, attente: 1, jumele: 2 })[b.etat] || (a.creeLe || 0) - (b.creeLe || 0));
+  const ms = mentors().filter(inE);
+  const pending = ms.reduce((t, m) => t + demandesRecues(m.uid).filter(d => d.statut === 'attente').length, 0);
+  const seuls = ns.filter(n => n.etat === 'seul').length;
+  const dispo = ms.filter(m => m.mentorat && mentoratsActifs(m.uid) < (m.places || 0)).length;
+  const lab = { seul: '<span class="pill danger">Sans contact</span>', attente: '<span class="pill warn">En attente</span>', jumele: '<span class="pill ok">Jumelé</span>' };
+  return `<div class="stack">
+    <div class="chips">${[['all', 'Toutes les écoles'], ...S.ecoles.map(e => [e.id, e.nom])].map(([k, l]) =>
+      `<button class="chip" data-act="suivi-ecole" data-id="${esc(k)}" aria-pressed="${k === ecole}">${esc(l)}</button>`).join('')}</div>
+    <div class="tiles">
+      <div class="tile${seuls ? ' alert' : ''}"><b>${seuls}</b><span>nouveaux sans contact</span></div>
+      <div class="tile"><b>${pending}</b><span>demandes en attente</span></div>
+      <div class="tile"><b>${dispo}</b><span>mentors avec une place</span></div>
+    </div>
+    <div class="section-head"><h2>Nouveaux profs</h2><span class="small muted">${ns.length}</span></div>
+    ${ns.map(n => {
+      const d = daysAgo(n.creeLe);
+      return `<div class="item">${avatar(n.uid, n.nom)}<div class="grow">
+        <p class="title">${esc(n.nom)}</p>
+        <p class="small muted">${esc(GROUPS[n.matiere] || '')} · ${esc(n.niveau || '')}${ecole === 'all' ? ' · ' + esc(ecoleNom(n.ecoleId)) : ''}</p>
+        <p class="small muted">${d === null ? '' : d === 0 ? "Inscrit aujourd'hui" : `Inscrit il y a ${d} jour${d > 1 ? 's' : ''}`} · ${n.nb} demande${n.nb > 1 ? 's' : ''}</p>
+        ${n.besoins ? `<p class="small">Cherche : ${esc(n.besoins)}</p>` : ''}
+      </div>${lab[n.etat]}</div>`;
+    }).join('') || '<p class="muted small">Aucun nouveau prof inscrit ici.</p>'}
+    <div class="section-head"><h2>Mentors</h2><span class="small muted">${ms.length}</span></div>
+    ${ms.map(m => {
+      const a = mentoratsActifs(m.uid), att = demandesRecues(m.uid).filter(d => d.statut === 'attente').length;
+      return `<div class="item">${avatar(m.uid, m.nom)}<div class="grow"><p class="title">${esc(m.nom)}</p>
+        <p class="small muted">${esc(m.fonction || GROUPS[m.matiere] || '')}${ecole === 'all' ? ' · ' + esc(ecoleNom(m.ecoleId)) : ''}</p></div>
+        <div class="stack" style="gap:4px;justify-items:end;text-align:right">
+          ${m.mentorat ? `<span class="pill${a >= (m.places || 0) ? '' : ' ok'}">${a}/${m.places || 0} mentorés</span>` : '<span class="pill">Café seulement</span>'}
+          ${att ? `<span class="pill warn">${att} en attente</span>` : ''}</div></div>`;
+    }).join('') || '<p class="muted small">Aucun mentor inscrit ici.</p>'}
+  </div>`;
+}
+
+// ----- IP : membres -----
+function renderMembres() {
+  const list = Object.entries(S.membres).map(([uid, m]) => ({ uid, ...m })).sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr'));
+  return `<div class="stack">
+    <div class="section-head"><h2>Membres</h2><span class="small muted">${list.length}</span></div>
+    ${list.map(m => `<div class="item">${avatar(m.uid, m.nom)}<div class="grow">
+      <p class="title">${esc(m.nom)}${m.uid === S.uid ? ' (toi)' : ''}</p>
+      <p class="small muted">${ROLE_LABEL[m.role] || ''} · ${esc(ecoleNom(m.ecoleId))}</p></div>
+      <button class="icon-btn" data-act="del-membre" data-id="${esc(m.uid)}" title="Retirer" aria-label="Retirer ${esc(m.nom)}">${ico('trash', 18)}</button></div>`).join('')
+    || `<div class="empty"><h3>Personne encore</h3><p>Partage le lien avec les profs. Leur fiche apparaîtra ici dès qu'ils l'auront créée.</p></div>`}
+  </div>`;
+}
+
+// ----- Ressources (tous) -----
+function renderRessources() {
+  const v = view();
+  const kept = new Map(S.etat.gardees.map(g => [g.k, g]));
+  const list = allResources().filter(r => S.resFilter === 'all' || (S.resFilter === 'mine' ? r.auteur === S.uid : r.type === S.resFilter));
+  const chips = [['all', 'Toutes'], ['mine', 'Les miennes'], ...Object.entries(RTYPES)];
+  return `<div class="stack">
+    <div class="section-head"><h2>Ressources</h2><button class="btn sm" data-act="ressource">${ico('plus', 16)} Partager</button></div>
+    <div class="chips">${chips.map(([k, l]) => `<button class="chip" data-act="res-filter" data-id="${k}" aria-pressed="${S.resFilter === k}">${esc(l)}</button>`).join('')}</div>
+    ${list.map(r => {
+      const link = safeUrl(r.lien);
+      const mine = r.auteur === S.uid;
+      const k = kept.get(r.key);
+      return `<div class="item" style="align-items:flex-start">
+        <div class="res-ico">${ico('book', 22)}</div>
+        <div class="grow"><p class="title">${esc(r.titre)}</p>
+          <p class="small muted">${esc(RTYPES[r.type] || 'Ressource')} · ${esc(GROUPS[r.matiere] || '')} · par ${esc(r.signature || S.membres[r.auteur]?.nom || 'un collègue')}</p>
+          ${r.desc ? `<p class="small" style="margin-top:4px">${esc(r.desc)}</p>` : ''}
+          <div class="row" style="margin-top:8px;flex-wrap:wrap">
+            ${link ? `<a class="btn sm ghost" href="${esc(link)}" target="_blank" rel="noopener">${ico('link', 14)} Ouvrir</a>` : ''}
+            ${v === 'nouveau' ? `<button class="btn sm ${k ? '' : 'ghost'}" data-act="garder" data-key="${esc(r.key)}">${k ? ico('check', 14) + ' Gardée' : 'Garder'}</button>` : ''}
+            ${mine ? `<button class="btn sm ghost" data-act="ressource" data-id="${esc(r.id)}">${ico('edit', 14)} Modifier</button>` : ''}
+            ${mine || S.isIP ? `<button class="btn sm ghost" data-act="del-ressource" data-key="${esc(r.key)}">${ico('trash', 14)} Supprimer</button>` : ''}
+          </div></div></div>`;
+    }).join('') || `<div class="empty"><h3>Aucune ressource ici</h3><p>Partage un guide, une planification ou un gabarit qui t'a aidé. Il apparaîtra dans le paquet des nouveaux profs.</p></div>`}
+  </div>`;
+}
+
+// ----- Mentor : ma fiche -----
+function renderFiche() {
+  const m = me();
+  const a = mentoratsActifs(S.uid);
+  return `<div class="stack">
+    <div class="section-head"><h2>Ma fiche d'offre d'aide</h2><button class="btn sm" data-act="profil">${ico('edit', 16)} Modifier</button></div>
+    <p class="small muted">Voici ce que les nouveaux profs de ${esc(ecoleNom(m.ecoleId))} voient en glissant.</p>
+    <div style="position:relative;height:500px">${cardHtml({ kind: 'prof', uid: S.uid, key: 'apercu', ...m }, true)}</div>
+    <div class="item"><div class="grow"><p class="title">Mentorat</p>
+      <p class="small muted">${m.mentorat ? `${a} sur ${m.places || 0} places occupées` : 'Tu offres seulement des rencontres café'}</p></div>
+      <span class="pill ${m.autoAccept ? 'ok' : ''}">${m.autoAccept ? 'Acceptation automatique' : 'Tu approuves chaque demande'}</span></div>
+  </div>`;
+}
+
+// ----- Mentor : demandes reçues -----
+function renderDemandes() {
+  const all = demandesRecues(S.uid);
+  const m = me();
+  const full = m.mentorat ? mentoratsActifs(S.uid) >= (m.places || 0) : true;
+  const att = all.filter(d => d.statut === 'attente'), ok = all.filter(d => d.statut === 'accepte');
+  const who = d => `${avatar(d.from, d.membre.nom)}<div class="grow"><p class="title">${esc(d.membre.nom)}</p>
+    <p class="small muted">${esc(GROUPS[d.membre.matiere] || '')} · ${esc(d.membre.niveau || '')}</p>
+    <p class="small"><span class="pill">${d.type === 'mentorat' ? 'Demande de mentorat' : 'Invitation café'}</span></p>
+    ${d.membre.besoins ? `<p class="small" style="margin-top:4px">Cherche : ${esc(d.membre.besoins)}</p>` : ''}`;
+  return `<div class="stack">
+    <div class="section-head"><h2>À répondre</h2><span class="small muted">${att.length}</span></div>
+    ${att.map(d => `<div class="item" style="align-items:flex-start">${who(d)}
+      <div class="row" style="margin-top:8px;flex-wrap:wrap">
+        <button class="btn sm" data-act="repondre" data-id="${esc(d.from)}" data-r="accepte"${d.type === 'mentorat' && full ? ' disabled title="Toutes tes places de mentorat sont prises"' : ''}>${ico('check', 14)} Accepter</button>
+        <button class="btn sm ghost" data-act="repondre" data-id="${esc(d.from)}" data-r="refuse">Pas maintenant</button></div>
+      ${d.type === 'mentorat' && full ? '<p class="small muted" style="margin-top:4px">Toutes tes places de mentorat sont prises. Ajoute une place dans ta fiche pour accepter.</p>' : ''}
+      </div></div>`).join('') || '<p class="muted small">Aucune demande en attente.</p>'}
+    <div class="section-head"><h2>Mes jumelages</h2><span class="small muted">${ok.length}</span></div>
+    ${ok.map(d => `<div class="item" style="align-items:flex-start">${who(d)}${contactHtml(d.membre)}</div></div>`).join('')
+      || '<p class="muted small">Quand tu acceptes une demande, les coordonnées de la personne apparaissent ici.</p>'}
+  </div>`;
+}
+
+function contactHtml(m) {
+  const lines = [];
+  if (m.courriel) lines.push(`<span>Courriel : <span class="sel">${esc(m.courriel)}</span></span>`);
+  if (m.local) lines.push(`<span>${esc(m.local)}</span>`);
+  if (m.dispo) lines.push(`<span>Disponible : ${esc(m.dispo)}</span>`);
+  return lines.length ? `<div class="contact">${lines.join('')}</div>` : '<p class="small muted" style="margin-top:6px">Pas de coordonnées dans la fiche. Passe le voir à l’école!</p>';
+}
+
+// ----- Nouveau : mon réseau -----
+function renderReseau() {
+  const vers = S.demandes[S.uid] || {};
+  const list = Object.entries(vers).filter(([id]) => S.membres[id]).map(([id, d]) => ({ id, ...d, m: S.membres[id], st: statut(S.uid, id) }));
+  const ok = list.filter(d => d.st === 'accepte'), att = list.filter(d => d.st === 'attente'), non = list.filter(d => d.st === 'refuse');
+  const kept = S.etat.gardees.map(g => ({ g, r: allResources().find(r => r.key === g.k) })).filter(x => x.r);
+  const who = d => `${avatar(d.id, d.m.nom)}<div class="grow"><p class="title">${esc(d.m.nom)}</p>
+    <p class="small muted">${esc(d.m.fonction || GROUPS[d.m.matiere] || '')} · ${d.type === 'mentorat' ? 'Mentorat' : 'Café'}</p>`;
+  return `<div class="stack">
+    <div class="section-head"><h2>Mes contacts</h2><span class="small muted">${ok.length}</span></div>
+    ${ok.map(d => `<div class="item" style="align-items:flex-start">${who(d)}${contactHtml(d.m)}</div></div>`).join('')
+      || '<p class="muted small">Glisse à droite sur un mentor dans Découvrir pour lui proposer un café.</p>'}
+    ${att.length ? `<div class="section-head"><h2>En attente</h2><span class="small muted">${att.length}</span></div>
+      ${att.map(d => `<div class="item">${who(d)}</div><button class="btn sm ghost" data-act="annuler" data-id="${esc(d.id)}">Annuler</button></div>`).join('')}` : ''}
+    ${non.length ? `<div class="section-head"><h2>Pas disponibles pour l'instant</h2></div>
+      ${non.map(d => `<div class="item">${who(d)}</div></div>`).join('')}` : ''}
+    <div class="section-head"><h2>Ressources gardées</h2><span class="small muted">${kept.length}</span></div>
+    ${kept.map(({ g, r }) => {
+      const link = safeUrl(r.lien);
+      return `<div class="item"><div class="res-ico">${ico(g.star ? 'star' : 'book', 22, g.star)}</div>
+        <div class="grow"><p class="title">${esc(r.titre)}</p><p class="small muted">${esc(RTYPES[r.type] || '')} · par ${esc(r.signature || S.membres[r.auteur]?.nom || 'un collègue')}</p></div>
+        ${link ? `<a class="icon-btn" href="${esc(link)}" target="_blank" rel="noopener" title="Ouvrir" aria-label="Ouvrir ${esc(r.titre)}">${ico('link', 18)}</a>` : ''}
+        <button class="icon-btn" data-act="garder" data-key="${esc(r.key)}" title="Retirer" aria-label="Retirer ${esc(r.titre)}">${ico('x', 18)}</button></div>`;
+    }).join('') || '<p class="muted small">Glisse à droite sur une ressource pour la garder ici.</p>'}
+  </div>`;
+}
+
+// ----- Nouveau : paquet de cartes -----
+function deckItems() {
+  const m = me();
+  const vers = S.demandes[S.uid] || {};
+  const passes = new Set(S.etat.passes), kept = new Set(S.etat.gardees.map(g => g.k));
+  const f = S.filter;
+  const okF = it => f === 'all' || (f === 'prof' && it.kind === 'prof') || (f === 'mentorat' && it.kind === 'prof' && it.mentorat)
+    || (f === 'res' && it.kind === 'res') || (f.startsWith('g:') && it.matiere === f.slice(2));
+  const score = it => (it.matiere === m.matiere ? 2 : 0) + (it.niveau === m.niveau ? 1 : 0) + (it.mentorat ? 1 : 0);
+  const realMentors = mentors().filter(x => x.uid !== S.uid);
+  let profs = realMentors.filter(x => S.scope === 'all' || x.ecoleId === m.ecoleId)
+    .map(x => ({ kind: 'prof', key: 'm:' + x.uid, ...x }))
+    .filter(x => !vers[x.uid] && !passes.has(x.key));
+  let res = allResources().filter(r => r.auteur !== S.uid && !kept.has(r.key) && !passes.has(r.key));
+  const exemples = !realMentors.length && !allResources().length;
+  if (exemples) { profs = EXEMPLES.filter(e => e.kind === 'prof' && !passes.has(e.key)); res = EXEMPLES.filter(e => e.kind === 'res' && !passes.has(e.key)); }
+  profs = profs.filter(okF).sort((a, b) => score(b) - score(a));
+  res = res.filter(okF).sort((a, b) => score(b) - score(a));
+  const out = []; let r = 0;
+  profs.forEach((p, i) => { out.push(p); if (i % 2 === 1 && r < res.length) out.push(res[r++]); });
+  return { items: out.concat(res.slice(r)), exemples };
+}
+
+function renderDeck() {
+  const main = $('Main');
+  const { items, exemples } = deckItems();
+  const filters = [['all', 'Tout'], ['prof', 'Mentors'], ['mentorat', 'Offrent du mentorat'], ['res', 'Ressources'],
+    ...Object.entries(GROUPS).map(([k, l]) => ['g:' + k, l])];
+  const sig = [S.filter, S.scope, exemples, items.slice(0, 3).map(i => i.key + (i.nom || i.titre)).join('|'), S.history.length, items.length].join('#');
+  if (main.dataset.sig === sig && main.classList.contains('deck-mode')) return;
+  main.className = 'deck-mode'; main.dataset.sig = sig;
+  const visible = items.slice(0, 3).reverse();
+  main.innerHTML = `
+    <div class="chips">${filters.map(([k, l]) => `<button class="chip" data-act="filter" data-id="${k}" aria-pressed="${S.filter === k}">${esc(l)}</button>`).join('')}</div>
+    <div class="row small muted" style="justify-content:space-between;flex:none">
+      <span>${exemples ? 'Exemples : aucun mentor inscrit pour le moment' : `${items.length} à découvrir`}</span>
+      <button class="chip" data-act="scope">${S.scope === 'ecole' ? 'Mon école' : 'Toutes les écoles'}</button></div>
+    <div class="stack-wrap" id="Stack">${items.length ? '' : `<div class="empty" style="height:100%;align-content:center">
+      <h3>Tu as fait le tour!</h3><p>${S.scope === 'ecole' ? "Tu as vu tous les mentors de ton école. Regarde ceux des autres écoles, ou va voir Mon réseau." : 'Va voir Mon réseau, ou revois les cartes que tu as passées.'}</p>
+      <div class="row" style="flex-wrap:wrap;justify-content:center">${S.scope === 'ecole' ? '<button class="btn" data-act="scope">Voir toutes les écoles</button>' : ''}
+      <button class="btn ghost" data-act="reset">Revoir les cartes passées</button></div></div>`}</div>
+    <div class="actions">
+      <button class="round s undo" data-act="undo" title="Annuler (Retour arrière)" aria-label="Annuler le dernier choix"${S.history.length ? '' : ' disabled'}>${ico('undo', 20)}</button>
+      <button class="round l" data-act="swipe" data-dir="nope" title="Passer (←)" aria-label="Passer">${ico('x', 28)}</button>
+      <button class="round s star" data-act="swipe" data-dir="super" title="Demander du mentorat ou marquer essentiel (↑)" aria-label="Demander du mentorat">${ico('star', 22, true)}</button>
+      <button class="round l yes" data-act="swipe" data-dir="like" title="Proposer un café ou garder (→)" aria-label="Proposer un café">${ico('coffee', 26)}</button>
+    </div>
+    <p class="hint">→ café ou garder · ↑ mentorat · ← passer</p>`;
+  const stack = $('Stack');
+  visible.forEach((it, idx) => {
+    const depth = visible.length - 1 - idx;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = cardHtml(it);
+    const card = wrap.firstElementChild;
+    if (depth) { card.style.transform = `scale(${1 - depth * .045}) translateY(${depth * 12}px)`; card.style.pointerEvents = 'none'; }
+    else attachDrag(card, it);
+    stack.appendChild(card);
+  });
+}
+
+function cardHtml(it, still = false) {
+  if (it.kind === 'res') {
+    return `<div class="card"${still ? ' style="cursor:default"' : ''} data-key="${esc(it.key)}">
+      <div class="bgfx" style="background:linear-gradient(160deg,#25332c,#0f1713)"></div>
+      <div class="top"><span class="tag gold">${esc(RTYPES[it.type] || 'Ressource')}</span><span class="tag">${esc(GROUPS[it.matiere] || '')}</span>${it.exemple ? '<span class="tag">Exemple</span>' : ''}</div>
+      <div class="big"><div class="resi">${ico('book', 52)}</div></div>
+      <div class="stamp like">Garder</div><div class="stamp nope">Passer</div><div class="stamp super">Essentiel</div>
+      <div class="body"><p style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:#f0bd55">Ressource</p>
+        <h2>${esc(it.titre)}</h2>${it.desc ? `<p style="font-size:14px;color:#d5e2da">${esc(it.desc)}</p>` : ''}
+        <p style="font-size:12px;color:#a9bcb1">Partagée par ${esc(it.signature || S.membres[it.auteur]?.nom || 'un collègue')}</p></div></div>`;
+  }
+  const a = it.exemple ? 0 : mentoratsActifs(it.uid);
+  const places = it.mentorat ? `<span class="tag">${Math.max(0, (it.places || 0) - a)} place${(it.places || 0) - a > 1 ? 's' : ''} de mentorat</span>` : '';
+  const tags = Array.isArray(it.tags) ? it.tags : [];
+  return `<div class="card"${still ? ' style="cursor:default"' : ''} data-key="${esc(it.key)}">
+    <div class="bgfx" style="background:${grad(it.uid)}"></div>
+    <div class="top"><span class="tag">${esc(GROUPS[it.matiere] || '')}</span><span class="row" style="gap:6px">${it.exemple ? '<span class="tag">Exemple</span>' : ''}${it.mentorat ? '<span class="tag gold">Mentor</span>' : ''}</span></div>
+    <div class="big"><div class="ini">${esc(initials(it.nom))}</div></div>
+    <div class="scrim"></div>
+    <div class="stamp like">Café?</div><div class="stamp nope">Passer</div><div class="stamp super">Mentorat</div>
+    <div class="body">
+      <h2>${esc(it.nom)}</h2>
+      <p style="font-size:14px;color:#e3ece6">${esc(it.fonction || '')}${it.niveau ? ' · ' + esc(it.niveau) : ''}</p>
+      <div class="meta">
+        ${it.local ? `<span>${ico('door', 14)}${esc(it.local)}</span>` : ''}
+        ${it.annees ? `<span>${ico('award', 14)}${esc(it.annees)} an${it.annees > 1 ? 's' : ''} d'expérience</span>` : ''}
+        ${it.dispo ? `<span>${ico('coffee', 14)}${esc(it.dispo)}</span>` : ''}
+      </div>
+      ${it.aideAvec ? `<div class="help"><p class="k">Je peux t'aider avec</p><p>${esc(it.aideAvec)}</p></div>` : ''}
+      <div class="tags">${places}${tags.map(t => `<span>${esc(t)}</span>`).join('')}</div>
+    </div></div>`;
+}
+
+function attachDrag(card, it) {
+  let sx = 0, sy = 0, dx = 0, dy = 0, on = false;
+  const st = n => card.querySelector('.stamp.' + n);
+  const show = (l, n, s) => { st('like').style.opacity = l; st('nope').style.opacity = n; st('super').style.opacity = s; };
+  card.addEventListener('pointerdown', e => { on = true; S.dragging = true; card.setPointerCapture(e.pointerId); card.classList.remove('animating'); sx = e.clientX; sy = e.clientY; dx = dy = 0; });
+  card.addEventListener('pointermove', e => {
+    if (!on) return;
+    dx = e.clientX - sx; dy = e.clientY - sy;
+    card.style.transform = `translate(${dx}px, ${dy}px) rotate(${dx * .06}deg)`;
+    if (dx > 20) show(Math.min(dx / 110, 1), 0, 0); else if (dx < -20) show(0, Math.min(-dx / 110, 1), 0);
+    else if (dy < -40) show(0, 0, Math.min(-dy / 110, 1)); else show(0, 0, 0);
+  });
+  const end = () => {
+    if (!on) return;
+    on = false; card.classList.add('animating');
+    const dir = dx > 100 ? 'like' : dx < -100 ? 'nope' : (dy < -120 && Math.abs(dx) < 80) ? 'super' : null;
+    if (dir) return swipe(dir, card, it);
+    card.style.transform = ''; show(0, 0, 0); S.dragging = false;
+    if (S.pending) { S.pending = false; render(); }
+  };
+  card.addEventListener('pointerup', end);
+  card.addEventListener('pointercancel', end);
+}
+
+function swipe(dir, card, it) {
+  card.style.pointerEvents = 'none'; card.classList.add('animating');
+  card.querySelector('.stamp.' + dir).style.opacity = 1;
+  card.style.transform = dir === 'like' ? `translate(${innerWidth}px, 40px) rotate(28deg)`
+    : dir === 'super' ? `translate(0, -${innerHeight}px) scale(.9)` : `translate(-${innerWidth}px, 40px) rotate(-28deg)`;
+  S.dragging = true;
+  setTimeout(() => { S.dragging = false; S.pending = false; act(dir, it); }, 260);
+}
+
+function saveEtat() { return write(`data/users/${S.uid}/etat`, { passes: S.etat.passes.slice(-400), gardees: S.etat.gardees }); }
+function saveDemandes() { return write(`demandes/${S.uid}`, { vers: S.demandes[S.uid] || {} }); }
+
+function act(dir, it) {
+  if (dir === 'nope') {
+    S.etat.passes.push(it.key); saveEtat();
+    S.history.push({ t: 'pass', key: it.key });
+  } else if (it.exemple) {
+    S.etat.passes.push(it.key); saveEtat();
+    S.history.push({ t: 'pass', key: it.key });
+    toast("C'est une carte d'exemple. Les vrais mentors apparaîtront quand ils auront créé leur fiche.");
+  } else if (it.kind === 'res') {
+    S.etat.gardees.push({ k: it.key, star: dir === 'super' }); saveEtat();
+    S.history.push({ t: 'garde', key: it.key });
+    toast(dir === 'super' ? 'Ressource marquée essentielle' : 'Ressource gardée dans Mon réseau');
+  } else {
+    const type = dir === 'super' ? 'mentorat' : 'cafe';
+    if (type === 'mentorat' && !it.mentorat) {
+      toast(`${first(it.nom)} n'offre pas de mentorat. Invitation café envoyée.`);
+    }
+    const realType = type === 'mentorat' && it.mentorat ? 'mentorat' : 'cafe';
+    S.demandes[S.uid] = { ...(S.demandes[S.uid] || {}), [it.uid]: { type: realType, le: Date.now() } };
+    saveDemandes();
+    S.history.push({ t: 'demande', uid: it.uid });
+    if (statut(S.uid, it.uid) === 'accepte') showMatch(it, realType);
+    else if (!(type === 'mentorat' && !it.mentorat)) toast(`Demande envoyée à ${first(it.nom)}. Tu verras sa réponse dans Mon réseau.`);
+  }
+  render();
+}
+
+function undo() {
+  const h = S.history.pop();
+  if (!h) return;
+  if (h.t === 'pass') { S.etat.passes = S.etat.passes.filter(k => k !== h.key); saveEtat(); }
+  if (h.t === 'garde') { S.etat.gardees = S.etat.gardees.filter(g => g.k !== h.key); saveEtat(); }
+  if (h.t === 'demande') { const v = { ...(S.demandes[S.uid] || {}) }; delete v[h.uid]; S.demandes[S.uid] = v; saveDemandes(); }
+  toast('Dernier choix annulé');
+  render();
+}
+
+function showMatch(m, type) {
+  const mine = me();
+  openSheet(`<div class="match-hero">
+    <p class="label">${type === 'mentorat' ? 'Mentorat accepté' : 'Nouvelle connexion'}</p>
+    <h2>C'est un match!</h2>
+    <div class="pair">${avatar(S.uid, mine.nom)}<span style="color:var(--accent)">${ico('coffee', 28)}</span>${avatar(m.uid, m.nom)}</div>
+    <p>${esc(first(m.nom))} accepte les ${type === 'mentorat' ? 'demandes de mentorat' : 'invitations café'}. Écris-lui pour fixer un moment.</p>
+    <div style="width:100%;text-align:left">${contactHtml(m)}</div>
+    <button class="btn" style="width:100%" data-act="close">Continuer à découvrir</button></div>`);
+}
+
+// ---------- Feuilles ----------
+let sheetSubmit = null;
+function openSheet(html, onSubmit) {
+  sheetSubmit = onSubmit || null;
+  $('SheetRoot').innerHTML = `<div class="sheet-back" data-act="backdrop"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  const f = $('SheetRoot').querySelector('input:not([type=radio]):not([type=checkbox]), select, textarea');
+  if (f && innerWidth > 640) f.focus();
+}
+function closeSheet() { $('SheetRoot').innerHTML = ''; sheetSubmit = null; }
+const sheetOpen = () => !!$('SheetRoot').firstElementChild;
+const head = t => `<div class="sheet-head"><h2>${t}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Fermer">${ico('x', 18)}</button></div>`;
+
+function confirmSheet(title, text, label, fn) {
+  openSheet(`${head(esc(title))}<p>${esc(text)}</p><div class="row" style="justify-content:flex-end">
+    <button class="btn ghost" data-act="close">Annuler</button><button class="btn danger" data-act="confirm">${esc(label)}</button></div>`);
+  sheetSubmit = fn;
+}
+
+function profilSheet(roleHint) {
+  const m = me() || {};
+  const role = (S.view === 'mentor' || S.view === 'nouveau') ? S.view : (m.role || roleHint || 'nouveau');
+  const lockRole = S.view === 'mentor' || S.view === 'nouveau';
+  const v = (k, d = '') => esc(m[k] ?? d);
+  openSheet(`<form id="ProfilForm" class="stack" novalidate>${head(me() ? 'Mon profil' : 'Créer mon profil')}
+    ${lockRole ? `<input type="hidden" name="role" value="${role}">` : `<div class="roles" role="radiogroup" aria-label="Je suis">
+      <label><input type="radio" name="role" id="RoleNouveau" value="nouveau"${role === 'nouveau' ? ' checked' : ''}><b>Nouveau prof</b><span class="small muted">Je découvre l'école</span></label>
+      <label><input type="radio" name="role" id="RoleMentor" value="mentor"${role === 'mentor' ? ' checked' : ''}><b>Mentor</b><span class="small muted">J'offre mon aide</span></label></div>`}
+    <label class="field"><span>Prénom et nom</span><input id="FNom" name="nom" required maxlength="60" value="${v('nom')}" placeholder="Alex Gagnon"></label>
+    <div class="grid2">
+      <label class="field"><span>École</span><select id="FEcole" name="ecoleId"><option value="">Choisis ton école</option>${S.ecoles.map(e => `<option value="${esc(e.id)}"${e.id === m.ecoleId ? ' selected' : ''}>${esc(e.nom)}</option>`).join('')}</select></label>
+      <label class="field"><span>Matière</span><select id="FMatiere" name="matiere">${options(GROUPS, m.matiere)}</select></label>
+      <label class="field"><span>Niveau</span><select id="FNiveau" name="niveau">${LEVELS.map(l => `<option${l === m.niveau ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+      <label class="field"><span>Fonction</span><input id="FFonction" name="fonction" maxlength="60" value="${v('fonction')}" placeholder="Enseignante de français"></label>
+    </div>
+    <label class="field"><span>Courriel de l'école</span><input id="FCourriel" name="courriel" type="email" maxlength="80" value="${v('courriel')}" placeholder="prenom.nom@ecole.qc.ca">
+      <small>Visible par les membres de l'application, pour qu'on puisse t'écrire après un jumelage.</small></label>
+    <div class="stack" data-for="nouveau">
+      <label class="field"><span>Ce que je cherche</span><textarea id="FBesoins" name="besoins" rows="2" maxlength="200" placeholder="Gestion de classe, planifier ma première étape…">${v('besoins')}</textarea></label>
+    </div>
+    <div class="stack" data-for="mentor">
+      <div class="grid2">
+        <label class="field"><span>Local</span><input id="FLocal" name="local" maxlength="40" value="${v('local')}" placeholder="Local 214"></label>
+        <label class="field"><span>Années d'expérience</span><input id="FAnnees" name="annees" type="number" min="0" max="50" value="${v('annees')}"></label>
+      </div>
+      <label class="field"><span>Quand me trouver</span><input id="FDispo" name="dispo" maxlength="60" value="${v('dispo')}" placeholder="Dîner mardi et jeudi"></label>
+      <label class="field"><span>Je peux t'aider avec</span><textarea id="FAide" name="aideAvec" rows="2" maxlength="220" placeholder="Planifier ta première étape, corriger plus vite…">${v('aideAvec')}</textarea></label>
+      <label class="field"><span>Mots-clés</span><input id="FTags" name="tags" maxlength="120" value="${esc((m.tags || []).join(', '))}" placeholder="Lecture, Évaluation, Plein air"><small>Sépare-les par des virgules.</small></label>
+      <label class="check"><input type="checkbox" id="FMentorat" name="mentorat"${m.mentorat ? ' checked' : ''}><span><b>J'offre du mentorat</b><br><span class="small muted">Un accompagnement suivi pendant l'année, en plus des cafés.</span></span></label>
+      <label class="field"><span>Places de mentorat</span><input id="FPlaces" name="places" type="number" min="0" max="6" value="${esc(m.places ?? 1)}"></label>
+      <label class="check"><input type="checkbox" id="FAuto" name="autoAccept"${m.autoAccept ? ' checked' : ''}><span><b>Accepter automatiquement</b><br><span class="small muted">Le nouveau prof voit tout de suite tes coordonnées, sans attendre ta réponse.</span></span></label>
+    </div>
+    <p class="small" id="FErr" style="color:var(--danger)" hidden></p>
+    <button class="btn" type="submit">Enregistrer</button></form>`, saveProfil);
+  const sync = () => {
+    const r = $('ProfilForm').querySelector('[name=role]:checked, input[type=hidden][name=role]').value;
+    $('ProfilForm').querySelectorAll('[data-for]').forEach(el => el.hidden = el.dataset.for !== r);
+  };
+  $('ProfilForm').addEventListener('change', sync); sync();
+}
+
+function saveProfil(form) {
+  const fd = new FormData(form);
+  const g = k => String(fd.get(k) || '').trim();
+  const nom = g('nom');
+  const err = t => { const e = $('FErr'); e.textContent = t; e.hidden = false; };
+  if (!nom) return err('Écris ton prénom et ton nom pour que les collègues te reconnaissent.');
+  if (!g('ecoleId')) return err('Choisis ton école pour voir les collègues qui y travaillent.');
+  const role = g('role');
+  const prev = me() || {};
+  const data = { role, nom, ecoleId: g('ecoleId'), matiere: g('matiere'), niveau: g('niveau'), fonction: g('fonction'), courriel: g('courriel'),
+    creeLe: prev.creeLe || Date.now(), majLe: Date.now() };
+  if (role === 'mentor') Object.assign(data, {
+    local: g('local'), annees: Math.max(0, Math.min(50, parseInt(g('annees')) || 0)), dispo: g('dispo'), aideAvec: g('aideAvec'),
+    tags: g('tags').split(',').map(t => t.trim()).filter(Boolean).slice(0, 6), mentorat: fd.get('mentorat') === 'on',
+    places: Math.max(0, Math.min(6, parseInt(g('places')) || 0)), autoAccept: fd.get('autoAccept') === 'on' });
+  else data.besoins = g('besoins');
+  S.membres[S.uid] = data;
+  write(`membres/${S.uid}`, data).then(() => toast('Profil enregistré'));
+  closeSheet(); render();
+}
+
+function ecoleSheet(id) {
+  const e = S.ecoles.find(x => x.id === id) || {};
+  openSheet(`<form id="EcoleForm" class="stack" novalidate>${head(id ? 'Modifier l’école' : 'Nouvelle école')}
+    <label class="field"><span>Nom de l'école</span><input id="ENom" name="nom" required maxlength="80" value="${esc(e.nom || '')}" placeholder="École secondaire des Patriotes"></label>
+    <label class="field"><span>Ville ou secteur</span><input id="EVille" name="ville" maxlength="60" value="${esc(e.ville || '')}" placeholder="Beloeil"></label>
+    <p class="small" id="EErr" style="color:var(--danger)" hidden></p>
+    <div class="row" style="justify-content:space-between">
+      ${id ? `<button type="button" class="btn danger" data-act="del-ecole" data-id="${esc(id)}">${ico('trash', 16)} Supprimer</button>` : '<span></span>'}
+      <button class="btn" type="submit">Enregistrer</button></div></form>`, form => {
+    const nom = String(new FormData(form).get('nom') || '').trim();
+    if (!nom) { const er = $('EErr'); er.textContent = "Donne un nom à l'école."; er.hidden = false; return; }
+    const docId = id || 'e' + uidShort();
+    write(`ecoles/${docId}`, { nom, ville: String(new FormData(form).get('ville') || '').trim(), creeLe: e.creeLe || Date.now() })
+      .then(() => toast(id ? 'École modifiée' : 'École ajoutée'));
+    closeSheet();
+  });
+}
+
+function ressourceSheet(id) {
+  const mine = S.ressources[S.uid] || [];
+  const r = mine.find(x => x.id === id) || {};
+  openSheet(`<form id="ResForm" class="stack" novalidate>${head(id ? 'Modifier la ressource' : 'Partager une ressource')}
+    <label class="field"><span>Titre</span><input id="RTitre" name="titre" required maxlength="80" value="${esc(r.titre || '')}" placeholder="Ma grille de correction en écriture"></label>
+    <div class="grid2">
+      <label class="field"><span>Type</span><select id="RType" name="type">${options(RTYPES, r.type)}</select></label>
+      <label class="field"><span>Matière</span><select id="RMatiere" name="matiere">${options(GROUPS, r.matiere || me()?.matiere)}</select></label>
+    </div>
+    <label class="field"><span>Lien (facultatif)</span><input id="RLien" name="lien" type="url" maxlength="300" value="${esc(r.lien || '')}" placeholder="https://drive.google.com/…"></label>
+    <label class="field"><span>Pourquoi c'est utile</span><textarea id="RDesc" name="desc" rows="3" maxlength="300" placeholder="M'a sauvé la vie en septembre…">${esc(r.desc || '')}</textarea></label>
+    <label class="field"><span>Signature</span><input id="RSig" name="signature" maxlength="60" value="${esc(r.signature || me()?.nom || '')}" placeholder="Équipe d'insertion"></label>
+    <p class="small" id="RErr" style="color:var(--danger)" hidden></p>
+    <button class="btn" type="submit">${id ? 'Enregistrer' : 'Partager'}</button></form>`, form => {
+    const fd = new FormData(form); const g = k => String(fd.get(k) || '').trim();
+    const err = $('RErr');
+    if (!g('titre')) { err.textContent = 'Donne un titre à la ressource.'; err.hidden = false; return; }
+    if (g('lien') && !safeUrl(g('lien'))) { err.textContent = 'Le lien doit commencer par https://'; err.hidden = false; return; }
+    const item = { id: id || uidShort(), titre: g('titre'), type: g('type'), matiere: g('matiere'), lien: g('lien'), desc: g('desc'),
+      signature: g('signature'), creeLe: r.creeLe || Date.now() };
+    const items = id ? mine.map(x => x.id === id ? item : x) : [item, ...mine];
+    S.ressources[S.uid] = items;
+    write(`ressources/${S.uid}`, { items }).then(() => toast(id ? 'Ressource modifiée' : 'Ressource partagée'));
+    closeSheet(); render();
+  });
+}
+
+// ---------- Actions ----------
+const ACTIONS = {
+  tab: d => { S.tab = d.tab; render(); $('Main').scrollTop = 0; },
+  profil: d => profilSheet(d.role),
+  close: () => closeSheet(),
+  backdrop: (d, el, e) => { if (e.target === el) closeSheet(); },
+  confirm: () => { const f = sheetSubmit; closeSheet(); f && f(); },
+  filter: d => { S.filter = d.id; render(); },
+  scope: () => { S.scope = S.scope === 'ecole' ? 'all' : 'ecole'; render(); },
+  'res-filter': d => { S.resFilter = d.id; render(); },
+  'suivi-ecole': d => { S.suiviEcole = d.id; render(); },
+  swipe: d => {
+    const top = $('Stack')?.lastElementChild;
+    const it = deckItems().items[0];
+    if (!top || !it || !top.classList.contains('card')) return;
+    swipe(d.dir, top, it);
+  },
+  undo: () => undo(),
+  reset: () => { S.etat.passes = []; S.history = []; saveEtat(); render(); toast('Les cartes passées sont revenues'); },
+  ecole: d => ecoleSheet(d.id),
+  'del-ecole': d => {
+    const e = S.ecoles.find(x => x.id === d.id);
+    const n = Object.values(S.membres).filter(m => m.ecoleId === d.id).length;
+    confirmSheet(`Supprimer ${e?.nom || 'cette école'}?`, n ? `${n} membre${n > 1 ? 's' : ''} y sont inscrits. Leur fiche restera, mais sans école.` : "Personne n'y est inscrit.", 'Supprimer',
+      () => remove(`ecoles/${d.id}`).then(() => toast('École supprimée')));
+  },
+  'del-membre': d => {
+    const m = S.membres[d.id];
+    confirmSheet(`Retirer ${m?.nom || 'ce membre'}?`, 'Sa fiche disparaîtra du paquet et du suivi. La personne pourra en créer une nouvelle.', 'Retirer',
+      () => remove(`membres/${d.id}`).then(() => toast('Fiche retirée')));
+  },
+  ressource: d => ressourceSheet(d.id),
+  'del-ressource': d => {
+    const [, auteur, id] = d.key.split(':');
+    const items = (S.ressources[auteur] || []).filter(x => x.id !== id);
+    confirmSheet('Supprimer cette ressource?', 'Elle disparaîtra pour tout le monde.', 'Supprimer', () => {
+      S.ressources[auteur] = items;
+      write(`ressources/${auteur}`, { items }).then(() => toast('Ressource supprimée')); render();
+    });
+  },
+  garder: d => {
+    const has = S.etat.gardees.some(g => g.k === d.key);
+    S.etat.gardees = has ? S.etat.gardees.filter(g => g.k !== d.key) : [...S.etat.gardees, { k: d.key, star: false }];
+    saveEtat(); render(); toast(has ? 'Retirée de Mon réseau' : 'Gardée dans Mon réseau');
+  },
+  repondre: d => {
+    S.reponses[S.uid] = { ...(S.reponses[S.uid] || {}), [d.id]: d.r };
+    write(`reponses/${S.uid}`, { de: S.reponses[S.uid] }).then(() => toast(d.r === 'accepte' ? 'Jumelage confirmé' : 'Réponse envoyée'));
+    render();
+  },
+  annuler: d => { const v = { ...(S.demandes[S.uid] || {}) }; delete v[d.id]; S.demandes[S.uid] = v; saveDemandes(); render(); toast('Demande annulée'); },
+};
+
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]');
+  if (a && ACTIONS[a.dataset.act]) ACTIONS[a.dataset.act](a.dataset, a, e);
+});
+document.addEventListener('submit', e => { e.preventDefault(); if (sheetSubmit) sheetSubmit(e.target); });
+document.addEventListener('change', e => {
+  if (e.target.id === 'ViewAs') { S.view = e.target.value === 'ip' ? null : e.target.value; S.tab = null; render(); }
+});
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && sheetOpen()) return closeSheet();
+  if (sheetOpen() || S.tab !== 'decouvrir' || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+  const dir = { ArrowLeft: 'nope', ArrowRight: 'like', ArrowUp: 'super' }[e.key];
+  if (dir) { e.preventDefault(); ACTIONS.swipe({ dir }); }
+  if (e.key === 'Backspace') undo();
+});
+
+boot();
+</script>
