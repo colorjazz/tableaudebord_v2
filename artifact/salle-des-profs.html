@@ -276,22 +276,26 @@ const S = {
   phase: 'loading', uid: null, isIP: false, loaded: new Set(),
   ecoles: [], membres: {}, ressources: {}, demandes: {}, reponses: {}, etat: { passes: [], gardees: [] },
   view: SEULEMENT_NOUVEAU ? 'nouveau' : null, tab: null, filter: 'all', scope: 'ecole', resFilter: 'all', suiviEcole: null,
-  history: [], dragging: false, pending: false,
+  history: [], dragging: false, pending: false, readonly: false, localVers: {},
 };
+// Profil fictif pour qui n'a que l'accès en lecture : on parcourt sans rien enregistrer.
+const VISITEUR = { role: 'nouveau', nom: '', ecoleId: null, matiere: null, niveau: null };
 
 // Une écriture à la fois par document, toujours avec l'état complet le plus récent.
 const queues = {};
 function write(path, data) {
+  if (S.readonly) return Promise.resolve();
   queues[path] = (queues[path] || Promise.resolve()).then(() => db.doc(path).set(data)).catch(writeError);
   return queues[path];
 }
 function remove(path) {
+  if (S.readonly) return Promise.resolve();
   queues[path] = (queues[path] || Promise.resolve()).then(() => db.doc(path).delete()).catch(writeError);
   return queues[path];
 }
 
 // ---------- Données dérivées ----------
-const me = () => S.membres[S.uid];
+const me = () => S.membres[S.uid] || (S.readonly ? VISITEUR : undefined);
 const view = () => S.view || (S.isIP ? 'ip' : me()?.role || null);
 const ecoleNom = id => S.ecoles.find(e => e.id === id)?.nom || 'École non précisée';
 const mentors = () => Object.entries(S.membres).filter(([, m]) => m.role === 'mentor').map(([uid, m]) => ({ uid, ...m }));
@@ -324,10 +328,15 @@ async function boot() {
   render();
   if (!window.claude || !window.claude.use) { S.phase = 'offline'; return render(); }
   [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
-  if (!db || !user) { S.phase = 'offline'; return render(); }
-  [S.uid, S.isIP] = await Promise.all([user.id(), user.canEdit()]);
-  if (!S.uid) { S.phase = 'offline'; return render(); }
-  const done = k => { S.loaded.add(k); if (S.loaded.size === 6 && S.phase === 'loading') S.phase = 'ready'; render(); };
+  if (!db) { S.phase = 'offline'; return render(); }
+  if (user) {
+    const [id, ip, canWrite] = await Promise.all([user.id(), user.canEdit(), user.can('data.write')]);
+    S.uid = id; S.isIP = ip;
+    S.readonly = !id || canWrite === false;
+  } else S.readonly = true;
+  if (S.readonly) { S.uid = S.uid || 'visiteur'; S.scope = 'all'; S.isIP = false; }
+  const need = S.readonly ? 5 : 6;
+  const done = k => { S.loaded.add(k); if (S.loaded.size >= need && S.phase === 'loading') S.phase = 'ready'; render(); };
   const fail = e => console.warn(e);
   db.collection('ecoles').onSnapshot(s => {
     S.ecoles = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr'));
@@ -335,9 +344,13 @@ async function boot() {
   }, fail);
   db.collection('membres').onSnapshot(s => { S.membres = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); done('membres'); }, fail);
   db.collection('ressources').onSnapshot(s => { S.ressources = Object.fromEntries(s.docs.map(d => [d.id, d.data().items || []])); done('ressources'); }, fail);
-  db.collection('demandes').onSnapshot(s => { S.demandes = Object.fromEntries(s.docs.map(d => [d.id, d.data().vers || {}])); done('demandes'); }, fail);
+  db.collection('demandes').onSnapshot(s => {
+    S.demandes = Object.fromEntries(s.docs.map(d => [d.id, d.data().vers || {}]));
+    if (S.readonly) S.demandes[S.uid] = S.localVers;
+    done('demandes');
+  }, fail);
   db.collection('reponses').onSnapshot(s => { S.reponses = Object.fromEntries(s.docs.map(d => [d.id, d.data().de || {}])); done('reponses'); }, fail);
-  db.doc(`data/users/${S.uid}/etat`).onSnapshot(d => {
+  if (!S.readonly) db.doc(`data/users/${S.uid}/etat`).onSnapshot(d => {
     const v = d.exists ? d.data() : {};
     S.etat = { passes: [...(v.passes || [])], gardees: [...(v.gardees || [])] };
     done('etat');
@@ -359,7 +372,7 @@ function render() {
   if (S.phase === 'loading') { $('Tabs').hidden = true; main.className = ''; main.innerHTML = `<div class="empty"><p>Chargement de la salle des profs…</p></div>`; return; }
   if (S.phase === 'offline') {
     $('Tabs').hidden = true; main.className = '';
-    main.innerHTML = `<div class="empty"><h3>Connecte-toi pour entrer</h3><p>Ouvre ce lien dans claude.ai avec ton compte de l'école. Les fiches et les jumelages sont partagés avec toute l'équipe.</p></div>`;
+    main.innerHTML = `<div class="empty"><h3>Connecte-toi pour entrer</h3><p>Ouvre ce lien dans claude.ai en étant connecté à ton compte. Les fiches des collègues et les ressources apparaîtront ici.</p></div>`;
     return;
   }
   const v = view();
@@ -383,7 +396,9 @@ function renderHeader() {
   if (v) parts.push(ROLE_LABEL[v]);
   if (m && v !== 'ip') parts.push(ecoleNom(m.ecoleId));
   if (v === 'ip') parts.push(`${S.ecoles.length} école${S.ecoles.length > 1 ? 's' : ''}`);
-  $('Sub').textContent = S.phase === 'ready' ? (m && v !== 'ip' ? `Salut ${first(m.nom)} · ` : '') + parts.join(' · ') : S.phase === 'offline' ? 'Hors ligne' : 'Chargement…';
+  $('Sub').textContent = S.phase === 'ready'
+    ? (S.readonly ? 'Mode consultation' : (m && v !== 'ip' ? `Salut ${first(m.nom)} · ` : '') + parts.join(' · '))
+    : S.phase === 'offline' ? 'Non connecté' : 'Chargement…';
   let extra = '';
   if (S.phase === 'ready' && S.isIP && !SEULEMENT_NOUVEAU) {
     extra += `<select class="viewas" id="ViewAs" aria-label="Voir l'application comme">
@@ -391,7 +406,7 @@ function renderHeader() {
       <option value="mentor"${v === 'mentor' ? ' selected' : ''}>Voir comme mentor</option>
       <option value="nouveau"${v === 'nouveau' ? ' selected' : ''}>Voir comme nouveau</option></select>`;
   }
-  if (S.phase === 'ready' && m && v !== 'ip') extra += `<button class="icon-btn" data-act="profil" title="Mon profil" aria-label="Mon profil">${ico('user')}</button>`;
+  if (S.phase === 'ready' && m && v !== 'ip' && !S.readonly) extra += `<button class="icon-btn" data-act="profil" title="Mon profil" aria-label="Mon profil">${ico('user')}</button>`;
   const he = $('HeadExtra');
   if (he.dataset.html !== extra) { he.innerHTML = extra; he.dataset.html = extra; }
 }
@@ -516,7 +531,7 @@ function renderRessources() {
   const list = allResources().filter(r => S.resFilter === 'all' || (S.resFilter === 'mine' ? r.auteur === S.uid : r.type === S.resFilter));
   const chips = [['all', 'Toutes'], ['mine', 'Les miennes'], ...Object.entries(RTYPES)];
   return `<div class="stack">
-    <div class="section-head"><h2>Ressources</h2><button class="btn sm" data-act="ressource">${ico('plus', 16)} Partager</button></div>
+    <div class="section-head"><h2>Ressources</h2>${S.readonly ? '' : `<button class="btn sm" data-act="ressource">${ico('plus', 16)} Partager</button>`}</div>
     <div class="chips">${chips.map(([k, l]) => `<button class="chip" data-act="res-filter" data-id="${k}" aria-pressed="${S.resFilter === k}">${esc(l)}</button>`).join('')}</div>
     ${list.map(r => {
       const link = safeUrl(r.lien);
@@ -645,12 +660,14 @@ function renderDeck() {
   const visible = items.slice(0, 3).reverse();
   main.innerHTML = `
     <div class="chips">${filters.map(([k, l]) => `<button class="chip" data-act="filter" data-id="${k}" aria-pressed="${S.filter === k}">${esc(l)}</button>`).join('')}</div>
+    ${S.readonly ? `<p class="small" style="flex:none;padding:8px 12px;border-radius:12px;background:color-mix(in srgb, var(--chalk) 16%, transparent)">
+      <b>Mode consultation.</b> Tu peux parcourir les fiches, mais tes choix ne sont pas enregistrés.</p>` : ''}
     <div class="row small muted" style="justify-content:space-between;flex:none">
       <span>${exemples ? 'Exemples : aucun mentor inscrit pour le moment' : `${items.length} à découvrir`}</span>
-      <button class="chip" data-act="scope">${S.scope === 'ecole' ? 'Mon école' : 'Toutes les écoles'}</button></div>
+      ${S.readonly ? '' : `<button class="chip" data-act="scope">${S.scope === 'ecole' ? 'Mon école' : 'Toutes les écoles'}</button>`}</div>
     <div class="stack-wrap" id="Stack">${items.length ? '' : `<div class="empty" style="height:100%;align-content:center">
       <h3>Tu as fait le tour!</h3><p>${S.scope === 'ecole' ? "Tu as vu tous les mentors de ton école. Regarde ceux des autres écoles, ou va voir Mon réseau." : 'Va voir Mon réseau, ou revois les cartes que tu as passées.'}</p>
-      <div class="row" style="flex-wrap:wrap;justify-content:center">${S.scope === 'ecole' ? '<button class="btn" data-act="scope">Voir toutes les écoles</button>' : ''}
+      <div class="row" style="flex-wrap:wrap;justify-content:center">${S.scope === 'ecole' && !S.readonly ? '<button class="btn" data-act="scope">Voir toutes les écoles</button>' : ''}
       <button class="btn ghost" data-act="reset">Revoir les cartes passées</button></div></div>`}</div>
     <div class="actions">
       <button class="round s undo" data-act="undo" title="Annuler (Retour arrière)" aria-label="Annuler le dernier choix"${S.history.length ? '' : ' disabled'}>${ico('undo', 20)}</button>
@@ -739,7 +756,7 @@ function swipe(dir, card, it) {
 }
 
 function saveEtat() { return write(`data/users/${S.uid}/etat`, { passes: S.etat.passes.slice(-400), gardees: S.etat.gardees }); }
-function saveDemandes() { return write(`demandes/${S.uid}`, { vers: S.demandes[S.uid] || {} }); }
+function saveDemandes() { if (S.readonly) S.localVers = S.demandes[S.uid] || {}; return write(`demandes/${S.uid}`, { vers: S.demandes[S.uid] || {} }); }
 
 function act(dir, it) {
   if (dir === 'nope') {
@@ -783,7 +800,7 @@ function showMatch(m, type) {
   openSheet(`<div class="match-hero">
     <p class="label">${type === 'mentorat' ? 'Mentorat accepté' : 'Nouvelle connexion'}</p>
     <h2>C'est un match!</h2>
-    <div class="pair">${avatar(S.uid, mine.nom, mine.photo)}<span style="color:var(--accent)">${ico('coffee', 28)}</span>${avatar(m.uid, m.nom, m.photo)}</div>
+    <div class="pair">${avatar(S.uid, mine.nom || 'Toi', mine.photo)}<span style="color:var(--accent)">${ico('coffee', 28)}</span>${avatar(m.uid, m.nom, m.photo)}</div>
     <p>${esc(first(m.nom))} accepte les ${type === 'mentorat' ? 'demandes de mentorat' : 'invitations café'}. Écris-lui pour fixer un moment.</p>
     <div style="width:100%;text-align:left">${contactHtml(m)}</div>
     <button class="btn" style="width:100%" data-act="close">Continuer à découvrir</button></div>`);
