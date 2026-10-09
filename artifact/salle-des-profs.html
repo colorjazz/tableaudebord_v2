@@ -78,7 +78,12 @@ nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 700; }
 .item { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .item .grow { min-width: 0; flex: 1; }
 .item .title { font-weight: 700; overflow-wrap: anywhere; }
-.avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 800 15px var(--font-display); flex: none; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 800 15px var(--font-display); flex: none; overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.photo-pick { display: flex; align-items: center; gap: 14px; }
+.photo-pick .avatar { width: 72px; height: 72px; font-size: 24px; }
+.photo-pick input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .res-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none;
   background: color-mix(in srgb, var(--chalk) 18%, transparent); color: var(--chalk); }
 .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
@@ -234,7 +239,10 @@ const first = n => String(n || '').trim().split(/\s+/)[0] || 'Cette personne';
 const safeUrl = u => /^https?:\/\/\S+$/i.test(u || '') ? u : '';
 const hash = s => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 const grad = id => { const [a, b] = GRADS[hash(id) % GRADS.length]; return `linear-gradient(150deg, ${a}, ${b})`; };
-const avatar = (id, nom) => `<div class="avatar" style="background:${grad(id)}">${esc(initials(nom))}</div>`;
+const okPhoto = p => typeof p === 'string' && p.length < 260000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(p);
+const avatar = (id, nom, photo) => okPhoto(photo)
+  ? `<div class="avatar" style="background:${grad(id)}"><img src="${photo}" alt=""></div>`
+  : `<div class="avatar" style="background:${grad(id)}">${esc(initials(nom))}</div>`;
 const daysAgo = t => t ? Math.floor((Date.now() - t) / 864e5) : null;
 const uidShort = () => Math.random().toString(36).slice(2, 10);
 const options = (obj, sel) => Object.entries(obj).map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(v)}</option>`).join('');
@@ -408,7 +416,7 @@ function renderEcoles() {
     return `<div class="item">
       <div class="res-ico">${ico('school', 22)}</div>
       <div class="grow"><p class="title">${esc(e.nom)}</p>
-        <p class="small muted">${esc(e.ville || '')}${e.ville ? ' · ' : ''}${ms} mentor${ms > 1 ? 's' : ''} · ${ns.length} nouveau${ns.length > 1 ? 'x' : ''} · ${jum} jumelé${jum > 1 ? 's' : ''}</p></div>
+        <p class="small muted">${ms} mentor${ms > 1 ? 's' : ''} · ${ns.length} nouveau${ns.length > 1 ? 'x' : ''} · ${jum} jumelé${jum > 1 ? 's' : ''}</p></div>
       <button class="icon-btn" data-act="ecole" data-id="${esc(e.id)}" title="Modifier" aria-label="Modifier ${esc(e.nom)}">${ico('edit', 18)}</button>
     </div>`;
   }).join('');
@@ -446,7 +454,7 @@ function renderSuivi() {
     <div class="section-head"><h2>Nouveaux profs</h2><span class="small muted">${ns.length}</span></div>
     ${ns.map(n => {
       const d = daysAgo(n.creeLe);
-      return `<div class="item">${avatar(n.uid, n.nom)}<div class="grow">
+      return `<div class="item">${avatar(n.uid, n.nom, n.photo)}<div class="grow">
         <p class="title">${esc(n.nom)}</p>
         <p class="small muted">${esc(GROUPS[n.matiere] || '')} · ${esc(n.niveau || '')}${ecole === 'all' ? ' · ' + esc(ecoleNom(n.ecoleId)) : ''}</p>
         <p class="small muted">${d === null ? '' : d === 0 ? "Inscrit aujourd'hui" : `Inscrit il y a ${d} jour${d > 1 ? 's' : ''}`} · ${n.nb} demande${n.nb > 1 ? 's' : ''}</p>
@@ -456,7 +464,7 @@ function renderSuivi() {
     <div class="section-head"><h2>Mentors</h2><span class="small muted">${ms.length}</span></div>
     ${ms.map(m => {
       const a = mentoratsActifs(m.uid), att = demandesRecues(m.uid).filter(d => d.statut === 'attente').length;
-      return `<div class="item">${avatar(m.uid, m.nom)}<div class="grow"><p class="title">${esc(m.nom)}</p>
+      return `<div class="item">${avatar(m.uid, m.nom, m.photo)}<div class="grow"><p class="title">${esc(m.nom)}</p>
         <p class="small muted">${esc(m.fonction || GROUPS[m.matiere] || '')}${ecole === 'all' ? ' · ' + esc(ecoleNom(m.ecoleId)) : ''}</p></div>
         <div class="stack" style="gap:4px;justify-items:end;text-align:right">
           ${m.mentorat ? `<span class="pill${a >= (m.places || 0) ? '' : ' ok'}">${a}/${m.places || 0} mentorés</span>` : '<span class="pill">Café seulement</span>'}
@@ -470,7 +478,7 @@ function renderMembres() {
   const list = Object.entries(S.membres).map(([uid, m]) => ({ uid, ...m })).sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr'));
   return `<div class="stack">
     <div class="section-head"><h2>Membres</h2><span class="small muted">${list.length}</span></div>
-    ${list.map(m => `<div class="item">${avatar(m.uid, m.nom)}<div class="grow">
+    ${list.map(m => `<div class="item">${avatar(m.uid, m.nom, m.photo)}<div class="grow">
       <p class="title">${esc(m.nom)}${m.uid === S.uid ? ' (toi)' : ''}</p>
       <p class="small muted">${ROLE_LABEL[m.role] || ''} · ${esc(ecoleNom(m.ecoleId))}</p></div>
       <button class="icon-btn" data-act="del-membre" data-id="${esc(m.uid)}" title="Retirer" aria-label="Retirer ${esc(m.nom)}">${ico('trash', 18)}</button></div>`).join('')
@@ -526,7 +534,7 @@ function renderDemandes() {
   const m = me();
   const full = m.mentorat ? mentoratsActifs(S.uid) >= (m.places || 0) : true;
   const att = all.filter(d => d.statut === 'attente'), ok = all.filter(d => d.statut === 'accepte');
-  const who = d => `${avatar(d.from, d.membre.nom)}<div class="grow"><p class="title">${esc(d.membre.nom)}</p>
+  const who = d => `${avatar(d.from, d.membre.nom, d.membre.photo)}<div class="grow"><p class="title">${esc(d.membre.nom)}</p>
     <p class="small muted">${esc(GROUPS[d.membre.matiere] || '')} · ${esc(d.membre.niveau || '')}</p>
     <p class="small"><span class="pill">${d.type === 'mentorat' ? 'Demande de mentorat' : 'Invitation café'}</span></p>
     ${d.membre.besoins ? `<p class="small" style="margin-top:4px">Cherche : ${esc(d.membre.besoins)}</p>` : ''}`;
@@ -558,7 +566,7 @@ function renderReseau() {
   const list = Object.entries(vers).filter(([id]) => S.membres[id]).map(([id, d]) => ({ id, ...d, m: S.membres[id], st: statut(S.uid, id) }));
   const ok = list.filter(d => d.st === 'accepte'), att = list.filter(d => d.st === 'attente'), non = list.filter(d => d.st === 'refuse');
   const kept = S.etat.gardees.map(g => ({ g, r: allResources().find(r => r.key === g.k) })).filter(x => x.r);
-  const who = d => `${avatar(d.id, d.m.nom)}<div class="grow"><p class="title">${esc(d.m.nom)}</p>
+  const who = d => `${avatar(d.id, d.m.nom, d.m.photo)}<div class="grow"><p class="title">${esc(d.m.nom)}</p>
     <p class="small muted">${esc(d.m.fonction || GROUPS[d.m.matiere] || '')} · ${d.type === 'mentorat' ? 'Mentorat' : 'Café'}</p>`;
   return `<div class="stack">
     <div class="section-head"><h2>Mes contacts</h2><span class="small muted">${ok.length}</span></div>
@@ -655,8 +663,9 @@ function cardHtml(it, still = false) {
   const tags = Array.isArray(it.tags) ? it.tags : [];
   return `<div class="card"${still ? ' style="cursor:default"' : ''} data-key="${esc(it.key)}">
     <div class="bgfx" style="background:${grad(it.uid)}"></div>
+    ${okPhoto(it.photo) ? `<img class="photo" src="${it.photo}" alt="" draggable="false">` : ''}
     <div class="top"><span class="tag">${esc(GROUPS[it.matiere] || '')}</span><span class="row" style="gap:6px">${it.exemple ? '<span class="tag">Exemple</span>' : ''}${it.mentorat ? '<span class="tag gold">Mentor</span>' : ''}</span></div>
-    <div class="big"><div class="ini">${esc(initials(it.nom))}</div></div>
+    ${okPhoto(it.photo) ? '' : `<div class="big"><div class="ini">${esc(initials(it.nom))}</div></div>`}
     <div class="scrim"></div>
     <div class="stamp like">Café?</div><div class="stamp nope">Passer</div><div class="stamp super">Mentorat</div>
     <div class="body">
@@ -750,7 +759,7 @@ function showMatch(m, type) {
   openSheet(`<div class="match-hero">
     <p class="label">${type === 'mentorat' ? 'Mentorat accepté' : 'Nouvelle connexion'}</p>
     <h2>C'est un match!</h2>
-    <div class="pair">${avatar(S.uid, mine.nom)}<span style="color:var(--accent)">${ico('coffee', 28)}</span>${avatar(m.uid, m.nom)}</div>
+    <div class="pair">${avatar(S.uid, mine.nom, mine.photo)}<span style="color:var(--accent)">${ico('coffee', 28)}</span>${avatar(m.uid, m.nom, m.photo)}</div>
     <p>${esc(first(m.nom))} accepte les ${type === 'mentorat' ? 'demandes de mentorat' : 'invitations café'}. Écris-lui pour fixer un moment.</p>
     <div style="width:100%;text-align:left">${contactHtml(m)}</div>
     <button class="btn" style="width:100%" data-act="close">Continuer à découvrir</button></div>`);
@@ -783,6 +792,12 @@ function profilSheet(roleHint) {
     ${lockRole ? `<input type="hidden" name="role" value="${role}">` : `<div class="roles" role="radiogroup" aria-label="Je suis">
       <label><input type="radio" name="role" id="RoleNouveau" value="nouveau"${role === 'nouveau' ? ' checked' : ''}><b>Nouveau prof</b><span class="small muted">Je découvre l'école</span></label>
       <label><input type="radio" name="role" id="RoleMentor" value="mentor"${role === 'mentor' ? ' checked' : ''}><b>Mentor</b><span class="small muted">J'offre mon aide</span></label></div>`}
+    <div class="photo-pick"><span id="PhotoPreview">${avatar(S.uid, m.nom || '?', m.photo)}</span>
+      <div class="stack" style="gap:6px"><span class="small" style="font-weight:700">Photo</span>
+        <div class="row" style="flex-wrap:wrap">
+          <label class="btn sm ghost" for="FPhoto">Choisir une photo<input id="FPhoto" type="file" accept="image/*"></label>
+          <button type="button" class="btn sm ghost" id="FPhotoDel"${okPhoto(m.photo) ? '' : ' hidden'}>Retirer</button></div>
+        <small class="muted small">Elle apparaît sur ta carte et dans les jumelages.</small></div></div>
     <label class="field"><span>Prénom et nom</span><input id="FNom" name="nom" required maxlength="60" value="${v('nom')}" placeholder="Alex Gagnon"></label>
     <div class="grid2">
       <label class="field"><span>École</span><select id="FEcole" name="ecoleId"><option value="">Choisis ton école</option>${S.ecoles.map(e => `<option value="${esc(e.id)}"${e.id === m.ecoleId ? ' selected' : ''}>${esc(e.nom)}</option>`).join('')}</select></label>
@@ -814,6 +829,31 @@ function profilSheet(roleHint) {
     $('ProfilForm').querySelectorAll('[data-for]').forEach(el => el.hidden = el.dataset.for !== r);
   };
   $('ProfilForm').addEventListener('change', sync); sync();
+  pendingPhoto = undefined;
+  const preview = p => { $('PhotoPreview').innerHTML = avatar(S.uid, $('FNom').value || m.nom || '?', p); $('FPhotoDel').hidden = !okPhoto(p); };
+  $('FPhoto').addEventListener('change', async e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try { pendingPhoto = await shrinkPhoto(file); preview(pendingPhoto); }
+    catch { const er = $('FErr'); er.textContent = "Cette image n'a pas pu être lue. Essaie une photo JPEG ou PNG."; er.hidden = false; }
+    e.target.value = '';
+  });
+  $('FPhotoDel').addEventListener('click', () => { pendingPhoto = ''; preview(''); });
+}
+
+// Recadre au format de la carte (4:5) et compresse en JPEG pour tenir dans la fiche.
+let pendingPhoto;
+async function shrinkPhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = url; });
+    const W = 480, H = 600, r = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+    const w = img.naturalWidth * r, h = img.naturalHeight * r;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    c.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+    for (const q of [.78, .65, .5, .4]) { const d = c.toDataURL('image/jpeg', q); if (d.length < 180000) return d; }
+    throw new Error('trop lourde');
+  } finally { URL.revokeObjectURL(url); }
 }
 
 function saveProfil(form) {
@@ -825,7 +865,8 @@ function saveProfil(form) {
   if (!g('ecoleId')) return err('Choisis ton école pour voir les collègues qui y travaillent.');
   const role = g('role');
   const prev = me() || {};
-  const data = { role, nom, ecoleId: g('ecoleId'), matiere: g('matiere'), niveau: g('niveau'), fonction: g('fonction'), courriel: g('courriel'),
+  const photo = pendingPhoto !== undefined ? pendingPhoto : (okPhoto(prev.photo) ? prev.photo : '');
+  const data = { role, nom, photo, ecoleId: g('ecoleId'), matiere: g('matiere'), niveau: g('niveau'), fonction: g('fonction'), courriel: g('courriel'),
     creeLe: prev.creeLe || Date.now(), majLe: Date.now() };
   if (role === 'mentor') Object.assign(data, {
     local: g('local'), annees: Math.max(0, Math.min(50, parseInt(g('annees')) || 0)), dispo: g('dispo'), aideAvec: g('aideAvec'),
@@ -841,7 +882,6 @@ function ecoleSheet(id) {
   const e = S.ecoles.find(x => x.id === id) || {};
   openSheet(`<form id="EcoleForm" class="stack" novalidate>${head(id ? 'Modifier l’école' : 'Nouvelle école')}
     <label class="field"><span>Nom de l'école</span><input id="ENom" name="nom" required maxlength="80" value="${esc(e.nom || '')}" placeholder="École secondaire des Patriotes"></label>
-    <label class="field"><span>Ville ou secteur</span><input id="EVille" name="ville" maxlength="60" value="${esc(e.ville || '')}" placeholder="Beloeil"></label>
     <p class="small" id="EErr" style="color:var(--danger)" hidden></p>
     <div class="row" style="justify-content:space-between">
       ${id ? `<button type="button" class="btn danger" data-act="del-ecole" data-id="${esc(id)}">${ico('trash', 16)} Supprimer</button>` : '<span></span>'}
@@ -849,7 +889,7 @@ function ecoleSheet(id) {
     const nom = String(new FormData(form).get('nom') || '').trim();
     if (!nom) { const er = $('EErr'); er.textContent = "Donne un nom à l'école."; er.hidden = false; return; }
     const docId = id || 'e' + uidShort();
-    write(`ecoles/${docId}`, { nom, ville: String(new FormData(form).get('ville') || '').trim(), creeLe: e.creeLe || Date.now() })
+    write(`ecoles/${docId}`, { nom, creeLe: e.creeLe || Date.now() })
       .then(() => toast(id ? 'École modifiée' : 'École ajoutée'));
     closeSheet();
   });
